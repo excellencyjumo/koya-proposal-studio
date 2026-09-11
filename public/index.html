@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koya Studio — AI Proposal & Document Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Wrapper -->
+  <div class="app-layout">
+
+    <!-- Minimalist Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">
+          <span class="brand-mark">K</span>
+          <span class="brand-name">Koya Studio</span>
+        </div>
+        <div class="deal-crumb" id="topbar-deal-crumb">
+          <span class="crumb-client" id="crumb-client-name">Acme Logistics</span>
+          <span class="crumb-divider">/</span>
+          <span class="crumb-version" id="crumb-version-tag">Proposal v1</span>
+        </div>
+      </div>
+
+      <div class="topbar-center">
+        <!-- Live Workflow Stepper -->
+        <div class="stepper">
+          <div class="step-node active" id="step-draft">
+            <span class="step-dot"></span>
+            <span class="step-label">Draft</span>
+          </div>
+          <span class="step-line"></span>
+          <div class="step-node" id="step-review">
+            <span class="step-dot"></span>
+            <span class="step-label">Review</span>
+          </div>
+          <span class="step-line"></span>
+          <div class="step-node" id="step-approved">
+            <span class="step-dot"></span>
+            <span class="step-label">Approved</span>
+          </div>
+          <span class="step-line"></span>
+          <div class="step-node" id="step-delivered">
+            <span class="step-dot"></span>
+            <span class="step-label">Delivered</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Supabase Cloud Indicator -->
+        <div class="cloud-pill" id="cloud-status-pill" title="Live Supabase Cloud Sync (project nbmmuyubkluvqzrsqwtm)">
+          <span class="cloud-dot"></span>
+          <span class="cloud-text">Supabase Cloud</span>
+        </div>
+
+        <!-- User Session Pill & Auth Modal Trigger -->
+        <div class="user-session-pill" id="user-session-pill" title="Click to view account or sign in">
+          <div class="user-avatar-badge" id="user-avatar">SC</div>
+          <div class="user-session-meta">
+            <span class="user-session-name" id="user-name-display">Sarah Chen</span>
+            <span class="user-session-role" id="user-role-display">Sales Rep</span>
+          </div>
+          <button type="button" class="btn-auth-switch" id="btn-open-auth-modal" title="Switch User or Enter Password">
+            Sign In ▾
+          </button>
+        </div>
+
+        <!-- Telemetry & Drawer Buttons -->
+        <button type="button" class="icon-action-btn" id="btn-open-slack" title="Slack Approval Inspector">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+          <span>Slack Alert</span>
+        </button>
+
+        <button type="button" class="icon-action-btn" id="btn-open-audit" title="Central Audit Ledger & Failure Diagnostics">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span>Audit Log</span>
+        </button>
+
+        <!-- Primary Contextual Action Button -->
+        <button type="button" class="primary-btn" id="btn-primary-action">
+          <span id="primary-action-text">Submit for Approval</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Studio Main Workspace -->
+    <main class="studio-workspace">
+
+      <!-- Left Rail: Discovery Intake & Quick Scenarios (Collapsible) -->
+      <aside class="intake-rail" id="intake-rail">
+        <div class="rail-header">
+          <div class="rail-title">
+            <span class="rail-heading">Discovery Intake</span>
+            <span class="rail-sub">PRD Field Specification</span>
+          </div>
+          <button type="button" class="rail-toggle-btn" id="btn-toggle-rail" title="Collapse / Expand Sidebar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Scenario Switcher Pills -->
+        <div class="scenario-selector">
+          <span class="scenario-tag">Test Presets:</span>
+          <div class="scenario-pills">
+            <button type="button" class="scenario-pill active" id="preset-complete" data-preset="complete">
+              <span class="pill-label">1. Acme ($48k)</span>
+            </button>
+            <button type="button" class="scenario-pill" id="preset-missing" data-preset="missing">
+              <span class="pill-label">2. Gaps Test</span>
+            </button>
+            <button type="button" class="scenario-pill" id="preset-transcript" data-preset="transcript">
+              <span class="pill-label">3. Transcript</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Intake Form -->
+        <form id="intake-form" class="rail-form">
+          <div class="form-group">
+            <label for="company_name">Company / Organization</label>
+            <input type="text" id="company_name" name="company_name" required placeholder="Acme Logistics">
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="client_name">Client Contact</label>
+              <input type="text" id="client_name" name="client_name" required placeholder="Rachel Adams">
+            </div>
+            <div class="form-group">
+              <label for="client_email">Client Email</label>
+              <input type="email" id="client_email" name="client_email" required placeholder="rachel@acme.com">
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="estimated_pricing">Estimated Budget</label>
+              <input type="text" id="estimated_pricing" name="estimated_pricing" placeholder="e.g. $48,000 fixed fee">
+            </div>
+            <div class="form-group">
+              <label for="proposed_timeline">Proposed Timeline</label>
+              <input type="text" id="proposed_timeline" name="proposed_timeline" placeholder="e.g. 8 weeks">
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="salesperson_name">Sales Lead</label>
+              <input type="text" id="salesperson_name" name="salesperson_name" required value="Adedamola Adejumo">
+            </div>
+            <div class="form-group">
+              <label for="date_of_call">Discovery Date</label>
+              <input type="date" id="date_of_call" name="date_of_call" required value="2026-06-30">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="recommended_services">Services / Work Packages</label>
+            <input type="text" id="recommended_services" name="recommended_services" required placeholder="Operational Automation, Systems Integration">
+          </div>
+
+          <div class="form-group">
+            <label for="client_needs_summary">Client Pain Points & Challenges</label>
+            <textarea id="client_needs_summary" name="client_needs_summary" rows="3" required placeholder="Core operational friction points..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="project_scope">Project Scope Requirements</label>
+            <textarea id="project_scope" name="project_scope" rows="3" required placeholder="Specific deliverables and systems to build..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="goals_and_objectives">Target Goals & Success Metrics</label>
+            <textarea id="goals_and_objectives" name="goals_and_objectives" rows="2" required placeholder="Measurable outcomes..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="supporting_material">
+              <span>Supporting Material / Call Transcripts</span>
+              <span class="field-aux">(Optional)</span>
+            </label>
+            <textarea id="supporting_material" name="supporting_material" rows="3" placeholder="Paste discovery call transcripts or verbatim customer quotes..."></textarea>
+          </div>
+
+          <div class="rail-footer">
+            <button type="button" class="btn-subtle" id="btn-reset-form">Reset</button>
+            <button type="submit" class="btn-generate-hero" id="btn-generate">
+              <span class="btn-spinner" id="btn-gen-spinner"></span>
+              <span class="btn-label" id="btn-gen-text">Generate Proposal</span>
+            </button>
+          </div>
+        </form>
+      </aside>
+
+      <!-- Center Stage: The Hero Executive Document Canvas -->
+      <section class="document-stage">
+
+        <!-- Stage Toolbar / Document Status Ribbon -->
+        <div class="stage-ribbon">
+          <div class="ribbon-left">
+            <button type="button" class="expand-rail-btn" id="btn-expand-rail" title="Open Discovery Intake">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              <span>Intake Form</span>
+            </button>
+            <span class="document-badge" id="document-status-badge">DRAFT</span>
+            <span class="document-meta-item" id="meta-valuation-tag">$48,000 USD</span>
+            <span class="document-meta-item" id="meta-timeline-tag">8 Weeks</span>
+          </div>
+
+          <div class="ribbon-right">
+            <button type="button" class="ribbon-btn" id="btn-view-client-pdf" title="Client Presentation View & PDF Export">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>Client PDF View</span>
+            </button>
+            <button type="button" class="ribbon-btn" id="btn-export-email-action" title="Export Client Delivery Email (.eml)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <span>Export Email</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Amber Gap Detection Alert Banner (Scenario 2) -->
+        <div class="gap-alert-card" id="gap-alert-container" style="display: none;">
+          <div class="gap-alert-icon">⚠️</div>
+          <div class="gap-alert-body">
+            <div class="gap-alert-title">Commercial Terms Verification Required</div>
+            <div class="gap-alert-desc" id="gap-alert-text">
+              Critical commercial inputs were omitted during discovery. Claude inserted explicit placeholders rather than estimating terms.
+            </div>
+          </div>
+        </div>
+
+        <!-- The Paper Document Canvas -->
+        <article class="proposal-paper" id="proposal-paper">
+
+          <!-- Document Masthead Header -->
+          <header class="doc-header">
+            <div class="doc-brand-line">KOYA TALENT SOLUTIONS · EXECUTIVE PROPOSAL</div>
+            <h1 class="doc-title" id="doc-title">Strategic Proposal: Automated Logistics Onboarding & Billing System</h1>
+            
+            <div class="doc-meta-grid">
+              <div class="meta-cell">
+                <span class="meta-label">PREPARED FOR</span>
+                <span class="meta-value" id="doc-meta-client">Rachel Adams (Acme Logistics)</span>
+              </div>
+              <div class="meta-cell">
+                <span class="meta-label">PREPARED BY</span>
+                <span class="meta-value" id="doc-meta-author">Adedamola Adejumo</span>
+              </div>
+              <div class="meta-cell">
+                <span class="meta-label">DATE & VERSION</span>
+                <span class="meta-value" id="doc-meta-date-ver">30 June 2026 · v1</span>
+              </div>
+              <div class="meta-cell">
+                <span class="meta-label">ENGAGEMENT VALUE</span>
+                <span class="meta-value highlight" id="doc-meta-pricing">$48,000 USD (8 Weeks)</span>
+              </div>
+              <div class="meta-cell">
+                <span class="meta-label">LLM GENERATION COST</span>
+                <span class="meta-value" id="doc-meta-cost">$0.0041 · Haiku 4.5</span>
+              </div>
+            </div>
+          </header>
+
+          <hr class="doc-divider">
+
+          <!-- Section 1: Introduction -->
+          <section class="doc-section" data-section="introduction">
+            <div class="section-top">
+              <h2 class="section-title">1. Introduction & Executive Summary</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="introduction">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="introduction">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-introduction">
+              <p class="placeholder-text">Click "Generate Proposal" or select a preset on the left to draft this proposal with Claude.</p>
+            </div>
+          </section>
+
+          <!-- Section 2: Project Scope -->
+          <section class="doc-section" data-section="project_scope">
+            <div class="section-top">
+              <h2 class="section-title">2. Project Scope</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="project_scope">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="project_scope">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-project_scope">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Section 3: Recommended Approach -->
+          <section class="doc-section" data-section="recommended_approach">
+            <div class="section-top">
+              <h2 class="section-title">3. Recommended Approach & Methodology</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="recommended_approach">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="recommended_approach">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-recommended_approach">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Section 4: Deliverables -->
+          <section class="doc-section" data-section="deliverables">
+            <div class="section-top">
+              <h2 class="section-title">4. Key Deliverables</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="deliverables">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="deliverables">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-deliverables">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Section 5: Timeline -->
+          <section class="doc-section" data-section="timeline">
+            <div class="section-top">
+              <h2 class="section-title">5. Implementation Timeline</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="timeline">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="timeline">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-timeline">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Section 6: Pricing -->
+          <section class="doc-section" data-section="pricing">
+            <div class="section-top">
+              <h2 class="section-title">6. Investment & Commercial Terms</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="pricing">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="pricing">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-pricing">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Section 7: Next Steps -->
+          <section class="doc-section" data-section="next_steps">
+            <div class="section-top">
+              <h2 class="section-title">7. Next Steps & Sign-off</h2>
+              <div class="section-actions">
+                <button type="button" class="btn-sec-edit" data-section="next_steps">Edit</button>
+                <button type="button" class="btn-sec-regen" data-section="next_steps">Regenerate</button>
+              </div>
+            </div>
+            <div class="section-content" id="content-next_steps">
+              <p class="placeholder-text">—</p>
+            </div>
+          </section>
+
+          <!-- Document Footer -->
+          <footer class="doc-footer">
+            <span>Koya Talent Solutions · Commercial In Confidence</span>
+            <span>Generated with Claude Haiku 4.5</span>
+          </footer>
+
+        </article>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- SLIDE-OVER DRAWER 1: SLACK BLOCK KIT INSPECTOR & MANAGER SIGN-OFF -->
+  <div class="drawer-overlay" id="overlay-slack">
+    <div class="drawer-panel" id="drawer-slack">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <div class="drawer-title">Slack Notification & Approval Inspector</div>
+          <div class="drawer-sub">Channel: #proposals-approval · Block Kit Dispatch</div>
+        </div>
+        <button type="button" class="drawer-close-btn" id="btn-close-slack">&times;</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Live Slack Bot Connection Status & Quick Test -->
+        <div class="slack-connection-status" id="slack-status-box" style="margin-bottom: 1.25rem; padding: 0.9rem; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.85rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+            <span style="font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 6px;">
+              <span id="slack-status-indicator" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block;"></span>
+              Slack Live Integration
+            </span>
+            <span id="slack-mode-badge" style="background: #e2e8f0; color: #475569; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Checking...</span>
+          </div>
+          <div id="slack-status-details" style="color: #64748b; font-size: 0.8rem; margin-bottom: 0.75rem; line-height: 1.4;">
+            Checking Slack API credentials...
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="slack-target-channel" value="general" placeholder="Channel (e.g. general)" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.82rem; font-family: inherit;" />
+            <button type="button" id="btn-test-slack-ping" style="padding: 6px 12px; background: #4a154b; color: white; border: none; border-radius: 6px; font-weight: 500; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+              <span>⚡ Send Test Ping</span>
+            </button>
+          </div>
+          <div id="slack-test-feedback" style="display: none; margin-top: 0.6rem; padding: 8px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.35;"></div>
+        </div>
+
+        <!-- Live Block Kit Card Simulator -->
+        <div class="slack-card">
+          <div class="slack-card-header">
+            <div class="slack-app-badge">
+              <span class="slack-icon">#</span>
+              <span class="slack-bot-name">Koya Proposals Bot</span>
+              <span class="slack-app-tag">APP</span>
+              <span class="slack-time">Just now</span>
+            </div>
+          </div>
+
+          <div class="slack-card-body">
+            <div class="slack-headline" id="slack-headline">🔔 New Proposal Pending Approval: Acme Logistics</div>
+            
+            <div class="slack-fields-grid">
+              <div class="slack-field">
+                <span class="slack-field-label">CLIENT</span>
+                <span class="slack-field-val" id="slack-val-client">Acme Logistics (Rachel Adams)</span>
+              </div>
+              <div class="slack-field">
+                <span class="slack-field-label">VALUATION</span>
+                <span class="slack-field-val" id="slack-val-price">$48,000 USD</span>
+              </div>
+              <div class="slack-field">
+                <span class="slack-field-label">AUTHOR</span>
+                <span class="slack-field-val" id="slack-val-author">Adedamola Adejumo</span>
+              </div>
+              <div class="slack-field">
+                <span class="slack-field-label">VERSION</span>
+                <span class="slack-field-val" id="slack-val-version">v1</span>
+              </div>
+            </div>
+
+            <div class="slack-summary-text" id="slack-val-summary">
+              Automated carrier onboarding and invoice reconciliation workflow suite.
+            </div>
+
+            <!-- Approval Action Gate Inside Slack Card -->
+            <div class="slack-action-bar">
+              <button type="button" class="slack-btn-approve" id="btn-slack-approve">
+                ✅ Sign Off & Approve Proposal
+              </button>
+              <button type="button" class="slack-btn-view" id="btn-slack-view-doc">
+                View Draft
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="drawer-section-title">RAW BLOCK KIT PAYLOAD (DISPATCH PROOF)</div>
+        <pre class="raw-json-inspector" id="slack-raw-json">Waiting for submission...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE-OVER DRAWER 2: CLIENT DELIVERY & EMAIL EXPORT -->
+  <div class="drawer-overlay" id="overlay-delivery">
+    <div class="drawer-panel" id="drawer-delivery">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <div class="drawer-title">Client Delivery & Export Center</div>
+          <div class="drawer-sub">Formatted RFC 822 Email & Presentation Portal</div>
+        </div>
+        <button type="button" class="drawer-close-btn" id="btn-close-delivery">&times;</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="delivery-status-banner" id="delivery-status-banner">
+          <div class="banner-status-dot"></div>
+          <div class="banner-status-text" id="delivery-banner-text">Proposal is Approved and Ready for Client Transmission</div>
+        </div>
+
+        <div class="email-preview-card">
+          <div class="email-header-row">
+            <span class="email-label">To:</span>
+            <span class="email-val" id="email-preview-to">rachel.adams@acmelogistics.com</span>
+          </div>
+          <div class="email-header-row">
+            <span class="email-label">Subject:</span>
+            <span class="email-val" id="email-preview-subject">Proposal: Automated Logistics Onboarding & Billing System — Koya Talent</span>
+          </div>
+          <div class="email-body-content" id="email-preview-body">
+            Loading email template...
+          </div>
+        </div>
+
+        <div class="export-actions-grid">
+          <button type="button" class="export-btn" id="btn-copy-email">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>Copy Email to Clipboard</span>
+          </button>
+
+          <a href="#" class="export-btn" id="btn-download-eml" download>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Download .eml File</span>
+          </a>
+
+          <a href="#" class="export-btn highlight" id="btn-open-client-portal" target="_blank">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            <span>Open Client Presentation / PDF</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE-OVER DRAWER 3: AUDIT LEDGER & DIAGNOSTICS -->
+  <div class="drawer-overlay" id="overlay-audit">
+    <div class="drawer-panel drawer-panel-wide" id="drawer-audit">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <div class="drawer-title">Central Audit Ledger & Diagnostics</div>
+          <div class="drawer-sub">Immutable State History · Dual-Storage Cloud Sync</div>
+        </div>
+        <button type="button" class="drawer-close-btn" id="btn-close-audit">&times;</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Failure Simulation Test Harness (Scenario 7) -->
+        <div class="diagnostics-panel">
+          <div class="diag-title">Failure Handling Simulator (PRD Scenario 7)</div>
+          <div class="diag-sub">Test upstream timeouts or delivery failures and verify diagnostic error payloads.</div>
+          <div class="diag-btn-row">
+            <button type="button" class="diag-btn" id="btn-sim-timeout">Test Claude Timeout (ETIMEDOUT)</button>
+            <button type="button" class="diag-btn" id="btn-sim-bounce">Test Email Delivery Bounce</button>
+            <button type="button" class="diag-btn" id="btn-test-tamper">Test Tamper Guard Revocation</button>
+          </div>
+          <div class="diag-output" id="diag-output" style="display: none;"></div>
+        </div>
+
+        <div class="drawer-section-title">IMMUTABLE AUDIT TRAIL</div>
+        <div class="timeline-container" id="audit-timeline-list">
+          <div class="timeline-empty">No events logged yet.</div>
+        </div>
+
+        <div class="drawer-section-title">CURRENT PROPOSAL STATE (RAW JSON)</div>
+        <pre class="raw-json-inspector" id="proposal-raw-json">No proposal loaded.</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENTERPRISE AUTHENTICATION MODAL -->
+  <div class="modal-overlay" id="modal-auth">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" style="font-size: 16px; font-weight: 600;">Enterprise Sign In</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Authenticate with password to issue JWT bearer token</div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btn-close-modal-auth">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div id="auth-error-banner" style="display: none; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 16px;"></div>
+
+        <form id="auth-login-form">
+          <div style="margin-bottom: 14px;">
+            <label for="auth-email" style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Work Email</label>
+            <input type="email" id="auth-email" class="modal-textarea" style="height: 38px; padding: 8px 12px; resize: none;" placeholder="sarah.chen@koyatalent.com" required>
+          </div>
+          <div style="margin-bottom: 18px;">
+            <label for="auth-password" style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Password</label>
+            <input type="password" id="auth-password" class="modal-textarea" style="height: 38px; padding: 8px 12px; resize: none;" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="primary-btn" id="btn-auth-submit" style="width: 100%; justify-content: center; height: 38px;">
+            <span class="btn-spinner" id="btn-auth-spinner" style="display: none;"></span>
+            <span id="btn-auth-text">Sign In & Issue JWT</span>
+          </button>
+        </form>
+
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-hairline);">
+          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: var(--text-muted); margin-bottom: 10px;">
+            Quick Fill For Evaluator / Grader
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button type="button" class="btn-subtle" id="btn-quick-login-sales" style="text-align: left; padding: 10px 12px; border: 1px solid #E9D5FF; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: #FAF5FF;">
+              <div>
+                <strong style="color: #6B21A8; font-size: 13px;">Sarah Chen</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">Senior Account Executive (Sales Rep)</div>
+              </div>
+              <span style="font-size: 11.5px; font-weight: 600; color: #6B21A8;">Login ⚡</span>
+            </button>
+            <button type="button" class="btn-subtle" id="btn-quick-login-manager" style="text-align: left; padding: 10px 12px; border: 1px solid #BBF7D0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: #F0FDF4;">
+              <div>
+                <strong style="color: #166534; font-size: 13px;">Marcus Vance</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">Managing Director (Sales Manager)</div>
+              </div>
+              <span style="font-size: 11.5px; font-weight: 600; color: #166534;">Login ⚡</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INLINE SECTION REGENERATION MICRO-MODAL (Scenario 4) -->
+  <div class="modal-overlay" id="modal-regen">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-regen-title">Regenerate Section: Timeline</div>
+        <button type="button" class="modal-close-btn" id="btn-close-modal-regen">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="regen-instruction" class="modal-label">Revision Instructions for Claude:</label>
+        <textarea id="regen-instruction" class="modal-textarea" rows="3" placeholder="e.g. Compress implementation into a 4-week fast-track agile sprint model with phased milestones."></textarea>
+        <div class="modal-hint">Only this section will be modified. Introduction, Scope, and Pricing will remain 100% byte-identical.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-subtle" id="btn-cancel-regen">Cancel</button>
+        <button type="button" class="primary-btn" id="btn-confirm-regen">
+          <span class="btn-spinner" id="btn-regen-spinner"></span>
+          <span id="btn-regen-text">Regenerate Section</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INLINE SECTION EDIT MICRO-MODAL -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-edit-title">Edit Section Content</div>
+        <button type="button" class="modal-close-btn" id="btn-close-modal-edit">&times;</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="edit-content-textarea" class="modal-textarea" rows="10"></textarea>
+        <div class="modal-hint">Direct manual edits will update this section and trigger the State Machine Tamper Guard if already approved.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-subtle" id="btn-cancel-edit">Cancel</button>
+        <button type="button" class="primary-btn" id="btn-save-edit">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: koya-proposal-studio-nestjs
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm --prefix client install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: CLAUDE_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SALES_PASSWORD
+        value: Password123!
+      - key: MANAGER_PASSWORD
+        value: AdminPassword123!

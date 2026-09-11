@@ -1,0 +1,16 @@
+node_modules/
+dist/
+client/node_modules/
+client/dist/
+data/
+.env
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.tmp
+*.zip
+Dockerfile
+docker-compose.yml
+.dockerignore

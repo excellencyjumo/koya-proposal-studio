@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Official Client Proposal — Koya Talent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-400: #94a3b8;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --emerald-700: #047857;
+      --emerald-50: #ecfdf5;
+      --paper: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--slate-50);
+      color: var(--slate-900);
+      font-family: "Plus Jakarta Sans", -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 30px 20px 80px;
+    }
+    .top-bar {
+      max-width: 860px;
+      margin: 0 auto 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-link {
+      color: var(--slate-700);
+      font-size: 13.5px;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s;
+    }
+    .brand-link:hover { color: var(--slate-900); }
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--slate-800);
+      border: 1px solid var(--slate-200);
+    }
+    .btn-secondary:hover { background: var(--slate-100); }
+    .btn-primary {
+      background: var(--slate-900);
+      color: #ffffff;
+      border: 1px solid var(--slate-900);
+    }
+    .btn-primary:hover { background: var(--slate-800); }
+    .btn-emerald {
+      background: var(--emerald-700);
+      color: #ffffff;
+      border: 1px solid var(--emerald-700);
+    }
+    .btn-emerald:hover {
+      background: #065f46;
+      border-color: #065f46;
+    }
+    .sheet {
+      max-width: 860px;
+      margin: 0 auto;
+      background: var(--paper);
+      padding: 64px 60px;
+      border: 1px solid var(--slate-200);
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 12px 28px -6px rgba(15, 23, 42, 0.05);
+      border-radius: 12px;
+    }
+    .hero-header {
+      border-bottom: 2px solid var(--slate-900);
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+    }
+    .hero-eyebrow {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--slate-700);
+      margin-bottom: 8px;
+    }
+    .hero-header h1 {
+      font-family: "Plus Jakarta Sans", -apple-system, sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      color: var(--slate-900);
+    }
+    .hero-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+      color: var(--slate-700);
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--slate-200);
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--emerald-50);
+      color: var(--emerald-700);
+      border: 1px solid #a7f3d0;
+    }
+    .badge-validity {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .badge-validity:hover {
+      transform: translateY(-1px);
+    }
+    .validity-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .validity-red {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #ef4444;
+    }
+    .dot-red {
+      background: #ef4444;
+    }
+    .validity-orange {
+      background: #fff7ed;
+      color: #c2410c;
+      border: 1px solid #f97316;
+    }
+    .dot-orange {
+      background: #f97316;
+    }
+    .validity-green {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #10b981;
+    }
+    .dot-green {
+      background: #10b981;
+    }
+    section {
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-family: "Plus Jakarta Sans", -apple-system, sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--slate-200);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      color: var(--slate-900);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .section-num {
+      font-family: "Plus Jakarta Sans", sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-400);
+    }
+    .section-body {
+      font-family: "Plus Jakarta Sans", -apple-system, sans-serif;
+      font-size: 14.5px;
+      line-height: 1.7;
+      color: #334155;
+    }
+    .section-body p {
+      margin-bottom: 12px;
+    }
+    .section-body ul {
+      margin: 8px 0 14px 20px;
+      list-style-type: disc;
+    }
+    .section-body ol {
+      margin: 8px 0 14px 20px;
+      list-style-type: decimal;
+    }
+    .section-body li {
+      margin-bottom: 6px;
+      padding-left: 4px;
+    }
+    .section-body h3, .section-body h4 {
+      margin: 18px 0 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .section-body strong {
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .tbc-pill {
+      display: inline-block;
+      padding: 1px 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #ef4444;
+      border-radius: 4px;
+    }
+    .signoff {
+      margin-top: 56px;
+      padding-top: 28px;
+      border-top: 1px solid var(--slate-200);
+      font-size: 13.5px;
+      color: var(--slate-600);
+    }
+    .acceptance-seal {
+      margin-top: 32px;
+      padding: 24px;
+      border-radius: 12px;
+      background: #ecfdf5;
+      border: 1.5px solid #a7f3d0;
+      color: #065f46;
+    }
+    .acceptance-cta-box {
+      margin-top: 32px;
+      padding: 24px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px dashed var(--slate-300);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .feedback-banner {
+      margin-top: 40px;
+      padding: 24px;
+      border-radius: 10px;
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    /* Modal styles */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(2px);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      max-width: 520px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--slate-200);
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--slate-200);
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      margin: 14px 0 18px;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--slate-900); }
+    .form-group {
+      margin-bottom: 14px;
+      text-align: left;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate-700);
+      margin-bottom: 5px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--slate-200);
+      font-family: inherit;
+      font-size: 13.5px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus {
+      border-color: var(--slate-900);
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { border: none; box-shadow: none; padding: 0; }
+      .top-bar, .feedback-banner, .modal-backdrop, .acceptance-cta-box { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <a href="/" class="brand-link">← Return to Studio</a>
+    <div class="action-group">
+      <button class="btn btn-emerald" id="btn-top-accept" onclick="openAcceptModal()">✍️ Accept & Sign Proposal</button>
+      <button class="btn btn-secondary" id="btn-top-revision" onclick="openFeedbackModal()">💬 Request Revisions</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="proposal-sheet">
+    <div id="loading" style="text-align: center; padding: 70px 0; color: var(--slate-600); font-weight: 500;">
+      Loading verified client proposal document...
+    </div>
+
+    <div id="content" style="display: none;">
+      <div class="hero-header">
+        <div class="hero-eyebrow">Enterprise Solutions Proposal</div>
+        <h1 id="p-title">Proposal for Client</h1>
+        <div class="hero-meta">
+          <div>
+            Prepared for: <strong id="p-company" style="color: var(--slate-900);">Company</strong> (<span id="p-client">Client</span>)<br>
+            Lead Solutions Architect: <span id="p-salesperson">Sarah Chen</span>
+          </div>
+          <div style="text-align: right;">
+            Date: <span id="p-date" style="font-family: 'JetBrains Mono', monospace;">2026-06-30</span><br>
+            Valid Until: <span id="p-valid-until" style="font-family: 'JetBrains Mono', monospace;">2026-07-30</span>
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <h2><span class="section-num">01</span> Executive Summary & Strategic Context</h2>
+        <div class="section-body" id="sec-1"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">02</span> Client Needs & Scope of Work</h2>
+        <div class="section-body" id="sec-2"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">03</span> Technical Architecture & Approach</h2>
+        <div class="section-body" id="sec-3"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">04</span> Phased Milestones & Timeline</h2>
+        <div class="section-body" id="sec-4"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">05</span> Commercial Terms & Pricing Structure</h2>
+        <div class="section-body" id="sec-5"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">06</span> Governance, SLA & Escalation Protocol</h2>
+        <div class="section-body" id="sec-6"></div>
+      </section>
+
+      <section>
+        <h2><span class="section-num">07</span> Standard Terms & Conditions</h2>
+        <div class="section-body" id="sec-7"></div>
+      </section>
+
+      <div class="signoff">
+        <p>Prepared and verified for executive transmission,</p>
+        <p style="margin-top: 6px;"><strong id="p-sign-salesperson" style="color: var(--slate-900);">Sarah Chen</strong><br>
+        Koya Talent · Enterprise Solutions Practice<br>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--slate-400);">proposals@koyatalent.com</span></p>
+      </div>
+
+      <!-- Digital Acceptance Seal or CTA Area -->
+      <div id="acceptance-section"></div>
+
+      <div class="feedback-banner" id="feedback-banner-box">
+        <div>
+          <strong style="color: var(--slate-900); font-size: 14px;">Need adjustments before signing?</strong>
+          <p style="font-size: 12.5px; color: var(--slate-600); margin-top: 2px;">Submit your feedback directly to the enterprise deal team to request revisions.</p>
+        </div>
+        <button class="btn btn-secondary" onclick="openFeedbackModal()">Request Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Feedback Modal -->
+  <div class="modal-backdrop" id="feedback-modal" onclick="closeFeedbackModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3 style="font-size: 18px; font-weight: 700; color: var(--slate-900); margin-bottom: 6px;">Submit Client Feedback & Revision Request</h3>
+      <p style="font-size: 13px; color: var(--slate-600);">Specify any milestone dates, scope additions, or pricing adjustments required. Your request will be routed directly to the sales manager for review.</p>
+      
+      <textarea id="feedback-input" placeholder="e.g. Please adjust the timeline from 8 weeks to 6 weeks, or apply a 10% commercial concession on milestone 2..."></textarea>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" onclick="closeFeedbackModal()">Cancel</button>
+        <button class="btn btn-primary" id="btn-submit-feedback" onclick="submitFeedback()">Send Feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Digital Acceptance Modal -->
+  <div class="modal-backdrop" id="accept-modal" onclick="closeAcceptModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span style="font-size: 24px;">✍️</span>
+        <div>
+          <h3 style="font-size: 18px; font-weight: 700; color: var(--slate-900);">Accept & Digitally Sign Proposal</h3>
+          <p style="font-size: 12px; color: var(--slate-500);">Enterprise Dual-Authorization & Execution Protocol</p>
+        </div>
+      </div>
+      <p style="font-size: 13px; color: var(--slate-600); margin-bottom: 16px;">
+        By submitting this digital signature, you confirm executive authorization to execute this agreement and accept the deliverables, milestones, and commercial terms outlined above.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label" for="accept-name-input">Authorized Signer Full Name *</label>
+        <input type="text" id="accept-name-input" class="form-input" placeholder="e.g. Eleanor Vance" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="accept-title-input">Corporate Title / Role *</label>
+        <input type="text" id="accept-title-input" class="form-input" placeholder="e.g. Chief Technology Officer / VP Engineering" />
+      </div>
+
+      <div style="margin: 16px 0; padding: 12px; background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 8px; font-size: 12px; color: var(--slate-600);">
+        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="accept-confirm-check" style="margin-top: 2px;" />
+          <span>I confirm I am authorized to bind my organization to the scope of work, fees, and standard terms in this document.</span>
+        </label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" onclick="closeAcceptModal()">Cancel</button>
+        <button class="btn btn-emerald" id="btn-submit-accept" onclick="submitAcceptance()">Confirm & Sign Agreement</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quote Validity Modal -->
+  <div class="modal-backdrop" id="validity-modal" onclick="closeValidityModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span style="font-size: 24px;">📅</span>
+        <div>
+          <h3 style="font-size: 18px; font-weight: 700; color: var(--slate-900);">Proposal Validity & Commercial Timeline</h3>
+          <p style="font-size: 12px; color: var(--slate-500);">30-Day Guaranteed Procurement Window</p>
+        </div>
+      </div>
+      
+      <div id="validity-modal-banner" style="margin: 14px 0; padding: 12px; border-radius: 8px; font-size: 13px;"></div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0;">
+        <div style="padding: 12px; background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 8px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-500); margin-bottom: 4px;">Issued Date</div>
+          <div id="validity-modal-issued" style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--slate-900);"></div>
+        </div>
+        <div style="padding: 12px; background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 8px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--slate-500); margin-bottom: 4px;">Expires On</div>
+          <div id="validity-modal-expiry" style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--slate-900);"></div>
+        </div>
+      </div>
+
+      <p style="font-size: 12.5px; color: var(--slate-600); line-height: 1.5; margin-bottom: 16px;">
+        Koya Talent guarantees milestone pricing, rate cards, and technical team availability for 30 calendar days from the discovery date.
+      </p>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeValidityModal()">Close Window</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+
+    function openFeedbackModal() {
+      document.getElementById('feedback-modal').style.display = 'flex';
+    }
+
+    function closeFeedbackModal(e) {
+      if (e && e.target !== document.getElementById('feedback-modal') && e.type === 'click') return;
+      document.getElementById('feedback-modal').style.display = 'none';
+    }
+
+    function openAcceptModal() {
+      document.getElementById('accept-modal').style.display = 'flex';
+    }
+
+    function openValidityModal(data, daysRemaining, formattedDate) {
+      document.getElementById('validity-modal-issued').textContent = data.date_of_call || '2026-07-10';
+      document.getElementById('validity-modal-expiry').textContent = formattedDate;
+      const banner = document.getElementById('validity-modal-banner');
+      if (daysRemaining <= 5 || data.is_expired) {
+        banner.style.background = '#fef2f2';
+        banner.style.color = '#991b1b';
+        banner.style.border = '1px solid #ef4444';
+        banner.innerHTML = `<strong>⚠️ Urgent Notice (≤ 5 Days Remaining):</strong> ${daysRemaining <= 0 || data.is_expired ? 'This proposal has expired. Re-quotation required.' : `Only ${daysRemaining} days remaining before quoted commercial terms expire.`}`;
+      } else if (daysRemaining <= 21) {
+        banner.style.background = '#fff7ed';
+        banner.style.color = '#c2410c';
+        banner.style.border = '1px solid #f97316';
+        banner.innerHTML = `<strong>⏳ Review Window (6–21 Days):</strong> Commercial terms guaranteed for ${daysRemaining} more days.`;
+      } else {
+        banner.style.background = '#ecfdf5';
+        banner.style.color = '#047857';
+        banner.style.border = '1px solid #10b981';
+        banner.innerHTML = `<strong>✅ Active Guarantee (≥ 22 Days):</strong> Proposal validity is securely active with ${daysRemaining} days remaining.`;
+      }
+      document.getElementById('validity-modal').style.display = 'flex';
+    }
+
+    function closeValidityModal(e) {
+      if (e && e.target !== document.getElementById('validity-modal') && e.type === 'click') return;
+      document.getElementById('validity-modal').style.display = 'none';
+    }
+
+    function closeAcceptModal(e) {
+      if (e && e.target !== document.getElementById('accept-modal') && e.type === 'click') return;
+      document.getElementById('accept-modal').style.display = 'none';
+    }
+
+    function submitFeedback() {
+      const feedback = document.getElementById('feedback-input').value.trim();
+      if (!feedback) {
+        alert('Please describe your feedback or requested changes.');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-feedback');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      fetch(`/api/proposals/${id}/request-client-revision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_feedback: feedback, actor: 'Client (Public Portal)' })
+      })
+      .then(r => r.json())
+      .then(res => {
+        alert('Your revision request has been submitted to the Koya management team. You will receive an updated proposal once approved.');
+        closeFeedbackModal();
+        window.location.reload();
+      })
+      .catch(err => {
+        alert('Error submitting feedback: ' + err.message);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Send Feedback';
+      });
+    }
+
+    function submitAcceptance() {
+      const name = document.getElementById('accept-name-input').value.trim();
+      const title = document.getElementById('accept-title-input').value.trim();
+      const confirmed = document.getElementById('accept-confirm-check').checked;
+
+      if (!name) {
+        alert('Please enter your full name as the authorized signer.');
+        return;
+      }
+      if (!title) {
+        alert('Please enter your corporate title.');
+        return;
+      }
+      if (!confirmed) {
+        alert('Please check the confirmation box to verify executive authorization.');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-accept');
+      btn.disabled = true;
+      btn.textContent = 'Recording Signature...';
+
+      fetch(`/api/proposals/${id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signer_name: name, signer_title: title })
+      })
+      .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.message || 'Acceptance failed'); });
+        return r.json();
+      })
+      .then(res => {
+        alert('🎉 Proposal accepted and digitally executed! An official confirmation and audit record have been generated.');
+        closeAcceptModal();
+        window.location.reload();
+      })
+      .catch(err => {
+        alert('Acceptance error: ' + err.message);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Confirm & Sign Agreement';
+      });
+    }
+
+    if (!id) {
+      document.getElementById('loading').textContent = 'Error: No proposal ID specified in URL.';
+    } else {
+      fetch(`/api/proposals/${id}/public`)
+        .then(r => {
+          if (!r.ok) throw new Error('Proposal not found or unapproved');
+          return r.json();
+        })
+        .then(data => {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+
+          document.getElementById('p-title').textContent = data.title;
+          document.getElementById('p-client').textContent = data.client_name;
+          document.getElementById('p-company').textContent = data.company_name;
+          document.getElementById('p-salesperson').textContent = data.salesperson_name;
+          document.getElementById('p-sign-salesperson').textContent = data.salesperson_name;
+          document.getElementById('p-date').textContent = data.date_of_call;
+
+          if (data.valid_until) {
+            const validDate = new Date(data.valid_until);
+            document.getElementById('p-valid-until').textContent = validDate.toISOString().split('T')[0];
+          } else {
+            document.getElementById('p-valid-until').textContent = '30 Days from Issue';
+          }
+
+          // Status & Digital Acceptance Handling
+          const acceptSection = document.getElementById('acceptance-section');
+          const topAcceptBtn = document.getElementById('btn-top-accept');
+          const topRevisionBtn = document.getElementById('btn-top-revision');
+          const feedbackBanner = document.getElementById('feedback-banner-box');
+
+          if (data.status === 'accepted' || data.acceptance) {
+            topAcceptBtn.style.display = 'none';
+            topRevisionBtn.style.display = 'none';
+            if (feedbackBanner) feedbackBanner.style.display = 'none';
+
+            const acc = data.acceptance || {};
+            const signerName = acc.accepted_by_name || 'Client Executive';
+            const signerTitle = acc.accepted_by_title || 'Authorized Representative';
+            const acceptDate = acc.accepted_at ? new Date(acc.accepted_at).toUTCString() : 'Confirmed';
+            const sigHash = acc.signature_hash || 'SHA256-VERIFIED';
+
+            acceptSection.innerHTML = `
+              <div class="acceptance-seal">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <span style="font-size: 20px;">🛡️</span>
+                  <div>
+                    <strong style="color: #065f46; font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em;">Digitally Executed & Accepted Agreement</strong>
+                    <div style="font-size: 12px; color: #047857; opacity: 0.9;">Legally binding agreement recorded in immutable audit ledger</div>
+                  </div>
+                </div>
+                <p style="font-size: 13.5px; color: #1e293b; margin: 10px 0 6px;">
+                  Executed by <strong>${signerName}</strong> (${signerTitle}) on <span style="font-family: 'JetBrains Mono', monospace;">${acceptDate}</span>.
+                </p>
+                <div style="font-size: 11.5px; font-family: 'JetBrains Mono', monospace; color: #475569;">
+                  Verification Hash: <strong>${sigHash}</strong> · Dual Authorization Gate Satisfied
+                </div>
+              </div>
+            `;
+          } else if (data.status === 'revision_requested') {
+            topAcceptBtn.disabled = true;
+            topAcceptBtn.style.opacity = '0.5';
+          } else {
+            // Active proposal awaiting client acceptance
+            acceptSection.innerHTML = `
+              <div class="acceptance-cta-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                  <div>
+                    <strong style="color: var(--slate-900); font-size: 14px;">Ready to proceed with this proposal?</strong>
+                    <p style="font-size: 12.5px; color: var(--slate-600); margin-top: 2px;">
+                      Sign and execute directly online to lock scope, timeline, and commercial pricing.
+                    </p>
+                  </div>
+                  <button class="btn btn-emerald" onclick="openAcceptModal()">✍️ Accept & Sign Proposal</button>
+                </div>
+              </div>
+            `;
+          }
+
+          const s = data.sections || {};
+          const stripLeadingSectionTitle = (text) => {
+            if (!text) return '';
+            return text
+              .replace(/^#*\s*(?:Section\s*)?\d+[\.\:\)\-]?\s*(?:Executive\s*Summary|Strategic\s*Context|Project\s*Scope|Client\s*Needs|Scope\s*of\s*Work|Technical\s*Architecture|Recommended\s*Approach|Approach|Phased\s*Milestones|Deliverables|Timeline|Milestones|Commercial\s*Terms|Pricing\s*Structure|Pricing|Investment|Governance|Next\s*Steps|Standard\s*Terms|Terms\s*(&|and)\s*Conditions|Next\s*Steps\s*(&|and)\s*Governance)[^\n]*\n+/i, '')
+              .replace(/^#+\s+[^\n]+\n+/, '')
+              .trim();
+          };
+
+          const cleanText = (raw) => {
+            if (!raw) return '';
+            let text = String(raw).trim();
+            if (text.startsWith('```json') || text.startsWith('{')) {
+              try {
+                const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                const parsed = JSON.parse(stripped);
+                if (parsed && typeof parsed === 'object') {
+                  if (parsed.introduction) text = String(parsed.introduction);
+                  else if (parsed.project_scope) text = String(parsed.project_scope);
+                }
+              } catch (e) {}
+            }
+            text = text.replace(/^```(?:json|markdown)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            return stripLeadingSectionTitle(text);
+          };
+
+          const formatInline = (str) => {
+            return str
+              .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+          };
+
+          const formatMarkdownHtml = (raw) => {
+            if (!raw) return '';
+            let text = cleanText(raw);
+
+            // Escape basic HTML entities
+            text = text
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+
+            // Replace [TO BE CONFIRMED] with clean styled badge
+            text = text.replace(/\[TO BE CONFIRMED(?:[^\]]*)\]/g, (match) => {
+              return `<span class="tbc-pill">${match}</span>`;
+            });
+
+            const lines = text.split(/\r?\n/);
+            let html = '';
+            let inList = false;
+            let inOrderedList = false;
+
+            for (let i = 0; i < lines.length; i++) {
+              let line = lines[i].trim();
+              if (!line) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                continue;
+              }
+
+              // Heading markdown
+              if (/^#{1,4}\s+(.+)$/.test(line)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                const title = line.replace(/^#{1,4}\s+/, '');
+                html += `<h3>${formatInline(title)}</h3>`;
+                continue;
+              }
+
+              // Subheading ending in colon (like "Scope Overview:" or "Key Deliverables:")
+              if (/^[A-Za-z0-9\s/&—–-]+:\s*$/.test(line) && line.length < 60) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                html += `<h3>${formatInline(line)}</h3>`;
+                continue;
+              }
+
+              // Unordered list item: starts with • or - or * (with trailing space)
+              if (/^[•\-*]\s+(.+)$/.test(line)) {
+                if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                if (!inList) { html += '<ul>'; inList = true; }
+                const itemText = line.replace(/^[•\-*]\s+/, '');
+                html += `<li>${formatInline(itemText)}</li>`;
+                continue;
+              }
+
+              // Ordered list item: starts with digit. (e.g. 1. )
+              if (/^\d+\.\s+(.+)$/.test(line)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (!inOrderedList) { html += '<ol>'; inOrderedList = true; }
+                const itemText = line.replace(/^\d+\.\s+/, '');
+                html += `<li>${formatInline(itemText)}</li>`;
+                continue;
+              }
+
+              // Paragraph
+              if (inList) { html += '</ul>'; inList = false; }
+              if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+              html += `<p>${formatInline(line)}</p>`;
+            }
+
+            if (inList) html += '</ul>';
+            if (inOrderedList) html += '</ol>';
+            return html;
+          };
+
+          document.getElementById('sec-1').innerHTML = formatMarkdownHtml(s.introduction || s.executive_summary || '');
+          document.getElementById('sec-2').innerHTML = formatMarkdownHtml(s.project_scope || s.client_needs || '');
+          document.getElementById('sec-3').innerHTML = formatMarkdownHtml(s.recommended_approach || s.technical_approach || '');
+          document.getElementById('sec-4').innerHTML = formatMarkdownHtml(s.deliverables || '');
+          document.getElementById('sec-5').innerHTML = formatMarkdownHtml(s.timeline || s.milestones || '');
+          document.getElementById('sec-6').innerHTML = formatMarkdownHtml(s.pricing || '');
+          document.getElementById('sec-7').innerHTML = formatMarkdownHtml(s.next_steps || s.governance || s.terms || '');
+        })
+        .catch(err => {
+          document.getElementById('loading').innerHTML = `
+            <div style="color: #991b1b; padding: 24px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+              <strong>Unable to load proposal document:</strong><br>${err.message}
+            </div>
+          `;
+        });
+    }
+  </script>
+</body>
+</html>

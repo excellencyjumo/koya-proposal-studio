@@ -1,0 +1,59 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import { validateEnvironment } from './config/env.validation';
+validateEnvironment();
+
+import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+import { LoggingInterceptor } from './observability/logging.interceptor';
+import { HttpExceptionFilter } from './observability/http-exception.filter';
+import { SlackService } from './slack/slack.service';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Security headers via Helmet (relaxed CSP to permit inline styles/scripts for demo dashboard)
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false
+    })
+  );
+
+  // CORS Configuration
+  app.enableCors({
+    origin: process.env.ALLOWED_ORIGIN || '*',
+    credentials: true
+  });
+
+  // Global Observability Logging Interceptor (structured JSON logs with request ID & timing)
+  app.useGlobalInterceptors(new LoggingInterceptor());
+
+  // Global Exception Filter (catches unhandled exceptions & dispatches 5xx alerts to Slack)
+  const slackService = app.get(SlackService);
+  app.useGlobalFilters(new HttpExceptionFilter(slackService));
+
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`[Koya Proposal Studio - NestJS] Server running on http://localhost:${port}`);
+  console.log(
+    `[Koya Proposal Studio - NestJS] Observability: Healthz at http://localhost:${port}/healthz`
+  );
+  console.log(
+    `[Koya Proposal Studio - NestJS] Model: ${process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001'}`
+  );
+  console.log(
+    `[Koya Proposal Studio - NestJS] Supabase Sync: ${process.env.SUPABASE_URL || 'Offline / Local-Only'}`
+  );
+}
+
+bootstrap().catch((err) => {
+  console.error('CRITICAL BOOTSTRAP ERROR:', err);
+  process.exit(1);
+});
