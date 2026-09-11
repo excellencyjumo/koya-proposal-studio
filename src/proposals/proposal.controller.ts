@@ -83,7 +83,16 @@ export class ProposalController {
   }
 
   @Get()
-  async getAll() {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getAll(@CurrentUser() user: any) {
+    if (!user || user.id === 'usr_anonymous') {
+      return {
+        success: true,
+        count: 0,
+        proposals: [],
+        message: 'Authentication required to view internal enterprise proposals'
+      };
+    }
     const proposals = await this.proposalService.getProposals();
     return {
       success: true,

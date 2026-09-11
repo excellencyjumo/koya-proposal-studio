@@ -171,6 +171,138 @@ Prepared by: ${proposal.salesperson_name} — Koya Talent Inc.
     }
   }
 
+  async sendApprovalEmail(params: {
+    proposal: any;
+    salesEmail: string;
+    salesName: string;
+    managerEmail: string;
+    managerName: string;
+    clientPortalUrl: string;
+    feedbackNotes?: string;
+    ccList?: string[];
+  }): Promise<EmailSendResult> {
+    const { proposal, salesEmail, salesName, managerEmail, managerName, clientPortalUrl, feedbackNotes, ccList = [] } = params;
+    const recipient = salesEmail || 'sarah.chen@koyatalent.com';
+    const allCcs = Array.from(new Set([managerEmail, ...ccList].filter(Boolean)));
+    const subject = `🎉 Proposal Approved: ${proposal.company_name} — Ready for Customer Delivery`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: #15803d; color: #ffffff; padding: 28px 32px; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+    .header p { margin: 6px 0 0 0; color: #bbf7d0; font-size: 13px; }
+    .content { padding: 32px; }
+    .status-badge { display: inline-block; background: #dcfce7; color: #15803d; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; margin-bottom: 16px; }
+    .notes-box { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; border-radius: 4px; margin: 20px 0; }
+    .proposal-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .btn-container { text-align: center; margin: 32px 0; }
+    .btn { display: inline-block; background: #15803d; color: #ffffff !important; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>✅ Proposal Approved by Management</h1>
+      <p>Authorization Granted for Client Delivery</p>
+    </div>
+    <div class="content">
+      <div class="status-badge">● Manager Sign-Off Complete</div>
+      <p>Hi <strong>${salesName}</strong>,</p>
+      <p>Your proposal for <strong>${proposal.company_name}</strong> has been formally reviewed and approved by <strong>${managerName}</strong>.</p>
+      
+      <div class="notes-box">
+        <strong style="color: #166534;">Manager Sign-Off Feedback:</strong><br/>
+        <em>"${feedbackNotes || 'Approved for client delivery. Scope and commercial terms validated.'}"</em>
+      </div>
+
+      <div class="proposal-card">
+        <div class="meta-row"><strong>Proposal ID:</strong> <span>${proposal.id}</span></div>
+        <div class="meta-row"><strong>Target Client:</strong> <span>${proposal.company_name} (${proposal.client_name})</span></div>
+        <div class="meta-row"><strong>Approver:</strong> <span>${managerName} (${managerEmail})</span></div>
+        <div class="meta-row"><strong>Sales Representative:</strong> <span>${salesName}</span></div>
+        <div class="meta-row"><strong>Action Required:</strong> <span style="color: #15803d; font-weight: bold;">Ready to Deliver</span></div>
+      </div>
+
+      <div class="btn-container">
+        <a href="${clientPortalUrl}" class="btn" target="_blank">Open Proposal Studio & Deliver to Client →</a>
+      </div>
+
+      <p style="font-size: 12px; color: #64748b;">CC: ${allCcs.join(', ')}</p>
+    </div>
+    <div class="footer">
+      <p>&copy; 2026 Koya Talent Inc. Four-Eyes Governance Enforced.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const plainText = `
+Proposal Approved: ${proposal.title}
+Company: ${proposal.company_name}
+Approved By: ${managerName} (${managerEmail})
+Sales Lead: ${salesName} (${recipient})
+CC: ${allCcs.join(', ')}
+
+Manager Feedback:
+${feedbackNotes || 'Approved for client delivery.'}
+
+Open in Studio to deliver:
+${clientPortalUrl}
+    `.trim();
+
+    if (!this.transporter) {
+      this.logger.log(`[SIMULATED APPROVAL EMAIL] To: ${recipient} | CC: ${allCcs.join(', ')} | Subject: ${subject}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        mode: 'simulated',
+        messageId: `appr_${Date.now()}`
+      };
+    }
+
+    try {
+      const mailOptions: any = {
+        from: this.fromAddress,
+        to: recipient,
+        subject,
+        text: plainText,
+        html: htmlBody
+      };
+      if (allCcs.length > 0) {
+        mailOptions.cc = allCcs;
+      }
+
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`[APPROVAL EMAIL SUCCESS] Message ID: ${info.messageId} | To: ${recipient} | CC: ${allCcs.join(', ')}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        messageId: info.messageId,
+        mode: this.mode
+      };
+    } catch (err: any) {
+      this.logger.error(`[APPROVAL EMAIL ERROR] ${err.message}`);
+      return {
+        success: false,
+        recipient,
+        subject,
+        mode: this.mode,
+        error: err.message
+      };
+    }
+  }
+
   async sendDirectTestEmail(toEmail: string): Promise<EmailSendResult> {
     const dummyProposal = {
       id: 'prop_test_email_verification',

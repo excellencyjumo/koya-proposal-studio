@@ -92,7 +92,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           </div>
         </button>
 
-        {currentProposal && (
+        {user && currentProposal && (
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 text-xs">
             <button
               onClick={onGoToDashboard}
@@ -111,7 +111,7 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       {/* Center: Contextual View Title & Status Pill */}
-      {currentProposal ? (
+      {user && currentProposal ? (
         <div className="hidden md:flex items-center gap-2.5">
           {onNavigateProposal && (hasPrev || hasNext) && (
             <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 bg-slate-50 dark:bg-slate-900">
@@ -195,7 +195,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         </button>
 
         {/* Return to Dashboard (if viewing a proposal) */}
-        {currentProposal && (
+        {user && currentProposal && (
           <button
             onClick={onGoToDashboard}
             className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
@@ -207,55 +207,57 @@ export const Topbar: React.FC<TopbarProps> = ({
         )}
 
         {/* Tools Dropdown: Groups Client View, Audit Log, Slack Preview */}
-        <div className="relative" ref={toolsRef}>
-          <button
-            onClick={() => setToolsOpen(!toolsOpen)}
-            className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
-            title="Governance & Integration Tools"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <span className="hidden md:inline">Tools</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
+        {user && (
+          <div className="relative" ref={toolsRef}>
+            <button
+              onClick={() => setToolsOpen(!toolsOpen)}
+              className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+              title="Governance & Integration Tools"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+              <span className="hidden md:inline">Tools</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
 
-          {toolsOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1.5 z-50 text-xs animate-in fade-in slide-in-from-top-1">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800/80 mb-1">
-                Governance & Delivery
-              </div>
+            {toolsOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1.5 z-50 text-xs animate-in fade-in slide-in-from-top-1">
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                  Governance & Delivery
+                </div>
 
-              {currentProposal && (
+                {currentProposal && (
+                  <button
+                    onClick={() => {
+                      onToggleClientView();
+                      setToolsOpen(false);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80 flex items-center gap-2.5 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <div>
+                      <div className="font-semibold">{isClientView ? 'Close Client View' : 'Client Portal View'}</div>
+                      <div className="text-[10px] text-slate-400">Sanitized client-facing preview</div>
+                    </div>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
-                    onToggleClientView();
+                    onOpenAudit();
                     setToolsOpen(false);
                   }}
                   className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80 flex items-center gap-2.5 transition-colors"
                 >
-                  <ExternalLink className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                  <History className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   <div>
-                    <div className="font-semibold">{isClientView ? 'Close Client View' : 'Client Portal View'}</div>
-                    <div className="text-[10px] text-slate-400">Sanitized client-facing preview</div>
+                    <div className="font-semibold">Audit Trail & Hashes</div>
+                    <div className="text-[10px] text-slate-400">Immutable governance logs</div>
                   </div>
                 </button>
-              )}
-
-              <button
-                onClick={() => {
-                  onOpenAudit();
-                  setToolsOpen(false);
-                }}
-                className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80 flex items-center gap-2.5 transition-colors"
-              >
-                <History className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                <div>
-                  <div className="font-semibold">Audit Trail & Hashes</div>
-                  <div className="text-[10px] text-slate-400">Immutable governance logs</div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Theme Switcher */}
         <button

@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- KOYA PROPOSAL STUDIO — SUPABASE POSTGRESQL DATA DURABILITY SCHEMA
 -- Project Reference: nbmmuyubkluvqzrsqwtm
 -- Run this in the Supabase SQL Editor: https://supabase.com/dashboard/project/nbmmuyubkluvqzrsqwtm/sql
@@ -102,6 +102,44 @@ CREATE TRIGGER set_proposals_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
 
+-- 7. Create TEAM MEMBERS Table (Sales Reps & Managers Email Directory)
+CREATE TABLE IF NOT EXISTS public.team_members (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL CHECK (role IN ('sales', 'manager', 'admin')),
+    title TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service role full access on team_members" ON public.team_members;
+CREATE POLICY "Service role full access on team_members" ON public.team_members
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public read access on team_members" ON public.team_members;
+CREATE POLICY "Public read access on team_members" ON public.team_members
+    FOR SELECT
+    TO anon, authenticated
+    USING (true);
+
+-- Seed Verified Team Directory for Automated Email CCs & Notifications
+INSERT INTO public.team_members (id, name, email, role, title) VALUES
+('usr_sales_01', 'Sarah Chen', 'sarah.chen@koyatalent.com', 'sales', 'Senior Account Executive'),
+('usr_mgr_01', 'Marcus Vance', 'marcus.vance@koyatalent.com', 'manager', 'Managing Director / Sales VP'),
+('usr_mgr_02', 'Elena Rostova', 'elena.rostova@koyatalent.com', 'manager', 'VP of Operations / Secondary Sign-off Manager'),
+('usr_lead_01', 'Excellency Jumo', 'excellencejumo@gmail.com', 'admin', 'Lead Executive / Project Lead')
+ON CONFLICT (id) DO UPDATE SET 
+    name = EXCLUDED.name,
+    email = EXCLUDED.email,
+    role = EXCLUDED.role,
+    title = EXCLUDED.title;
+
 -- Success Verification Note
 COMMENT ON TABLE public.proposals IS 'Koya Enterprise Proposal Studio — Primary Proposal Storage';
 COMMENT ON TABLE public.proposal_audit_logs IS 'Koya Enterprise Proposal Studio — Immutable Audit Trail';
+COMMENT ON TABLE public.team_members IS 'Koya Enterprise Proposal Studio — Team Member Email Directory for Approvals & CCs';

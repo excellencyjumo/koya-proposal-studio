@@ -432,7 +432,7 @@ export class ProposalService {
     };
   }
 
-  approveProposal(id: string, approver: any, feedbackNotes?: string) {
+  async approveProposal(id: string, approver: any, feedbackNotes?: string) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
@@ -525,15 +525,38 @@ export class ProposalService {
     this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
-    // Push Notification: Manager Approval
-
+    // Push Notification: Manager Approval to Slack
     this.slack.dispatchApprovalNotification(updated, approverName, feedbackNotes);
+
+    // Automated Email Dispatch to Sales Rep with CC to Approving Manager & Admin
+    const salesEmail = (updated.salesperson_name === 'Sarah Chen' ? 'sarah.chen@koyatalent.com' : 'sarah.chen@koyatalent.com');
+    const managerEmail = approver?.email || (approverName === 'Marcus Vance' ? 'marcus.vance@koyatalent.com' : 'elena.rostova@koyatalent.com');
+    const clientLink = `http://localhost:3000/proposals/${updated.id}`;
+
+    const approvalEmailResult = await this.emailService.sendApprovalEmail({
+      proposal: updated,
+      salesEmail,
+      salesName: updated.salesperson_name || 'Sales Representative',
+      managerEmail,
+      managerName: approverName,
+      clientPortalUrl: clientLink,
+      feedbackNotes,
+      ccList: ['excellencejumo@gmail.com']
+    });
+
+    const emailLog = this.storage.addAuditLog(id, 'approval_email_dispatched', 'System Mailer', {
+      to: salesEmail,
+      cc: [managerEmail, 'excellencejumo@gmail.com'],
+      result: approvalEmailResult
+    });
+    this.supabase.syncAuditLog(emailLog);
 
     return {
       success: true,
       proposal: updated,
       approved_by: approverName,
-      approved_at: now
+      approved_at: now,
+      approval_email: approvalEmailResult
     };
   }
 

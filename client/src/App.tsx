@@ -10,6 +10,7 @@ import { AuditDrawer } from './components/AuditDrawer';
 import { SlackModal } from './components/SlackModal';
 import { LoginModal } from './components/LoginModal';
 import { ClientView } from './components/ClientView';
+import { LoggedOutView } from './components/LoggedOutView';
 import { AlertCircle, CheckCircle2, Bug } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -36,13 +37,39 @@ export const App: React.FC = () => {
   };
 
   const loadProposals = async () => {
+    if (!user) {
+      setProposals([]);
+      return;
+    }
     try {
       const res = await api.getProposals();
       setProposals(res.proposals || []);
     } catch (err: any) {
       console.error('Failed to load proposals:', err);
+      setProposals([]);
     }
   };
+
+  // Strictly synchronize in-memory proposal data with authentication state
+  useEffect(() => {
+    if (user) {
+      loadProposals();
+    } else {
+      // User is logged out: Immediately wipe all proposals and active proposal from memory
+      setProposals([]);
+      setCurrentProposal(null);
+      setCurrentSection(null);
+      setAuditLogs([]);
+      setIsIntakeOpen(false);
+      setIsAuditOpen(false);
+      setIsSlackOpen(false);
+
+      // Clean URL if currently viewing internal proposals or intake
+      if (window.location.pathname.startsWith('/proposals/') || window.location.pathname === '/new') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }, [user]);
 
   const selectProposal = async (id: string, sectionKey: string | null = null, pushUrl = true) => {
     try {
@@ -117,28 +144,33 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const initApp = async () => {
-      await loadProposals();
-
       // Parse initial URL
       const path = window.location.pathname;
       const hash = window.location.hash;
       const params = new URLSearchParams(window.location.search);
       const section = params.get('section');
 
-      if (path === '/new') {
-        setIsIntakeOpen(true);
-      } else if (path.startsWith('/proposals/')) {
-        const id = path.replace('/proposals/', '').trim();
-        if (id) selectProposal(id, section, false);
-      } else if (path.startsWith('/client-view/')) {
+      if (path.startsWith('/client-view/')) {
         const id = path.replace('/client-view/', '').trim();
         if (id) {
           await selectProposal(id, null, false);
           setIsClientView(true);
         }
-      } else if (hash.startsWith('#proposal-')) {
-        const id = hash.replace('#proposal-', '').trim();
-        if (id) selectProposal(id, section, false);
+        return;
+      }
+
+      if (user) {
+        await loadProposals();
+
+        if (path === '/new') {
+          setIsIntakeOpen(true);
+        } else if (path.startsWith('/proposals/')) {
+          const id = path.replace('/proposals/', '').trim();
+          if (id) selectProposal(id, section, false);
+        } else if (hash.startsWith('#proposal-')) {
+          const id = hash.replace('#proposal-', '').trim();
+          if (id) selectProposal(id, section, false);
+        }
       }
     };
 
@@ -149,6 +181,25 @@ export const App: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const section = params.get('section');
 
+      if (path.startsWith('/client-view/')) {
+        setIsIntakeOpen(false);
+        const id = path.replace('/client-view/', '').trim();
+        if (id) {
+          selectProposal(id, null, false);
+          setIsClientView(true);
+        }
+        return;
+      }
+
+      setIsClientView(false);
+
+      if (!user) {
+        setIsIntakeOpen(false);
+        setCurrentProposal(null);
+        setCurrentSection(null);
+        return;
+      }
+
       if (path === '/new') {
         setIsIntakeOpen(true);
       } else if (path.startsWith('/proposals/')) {
@@ -156,20 +207,11 @@ export const App: React.FC = () => {
         const id = path.replace('/proposals/', '').trim();
         if (id) {
           selectProposal(id, section, false);
-          setIsClientView(false);
-        }
-      } else if (path.startsWith('/client-view/')) {
-        setIsIntakeOpen(false);
-        const id = path.replace('/client-view/', '').trim();
-        if (id) {
-          selectProposal(id, null, false);
-          setIsClientView(true);
         }
       } else {
         setIsIntakeOpen(false);
         setCurrentProposal(null);
         setCurrentSection(null);
-        setIsClientView(false);
       }
     };
 
@@ -340,7 +382,10 @@ export const App: React.FC = () => {
     return (
       <ClientView
         proposal={currentProposal}
-        onBack={() => setIsClientView(false)}
+        onBack={() => {
+          setIsClientView(false);
+          window.history.pushState({}, '', '/');
+        }}
       />
     );
   }
@@ -374,9 +419,11 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content Area: Dashboard or Proposal Document Sheet */}
+      {/* Main Content Area: Dashboard, Proposal Document Sheet, or LoggedOut Screen */}
       <main className="flex-1 flex overflow-hidden">
-        {currentProposal ? (
+        {!user ? (
+          <LoggedOutView />
+        ) : currentProposal ? (
           <DocumentView
             proposal={currentProposal}
             initialSection={currentSection}
@@ -419,7 +466,7 @@ export const App: React.FC = () => {
           <span className="text-slate-300 dark:text-slate-700">•</span>
           <span>Supabase Cloud Sync</span>
 
-          {demoMode && currentProposal && (
+          {demoMode && user && currentProposal && (
             <>
               <span className="text-slate-300 dark:text-slate-700">•</span>
               <button
