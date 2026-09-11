@@ -16,7 +16,7 @@ export interface Proposal {
   id: string;
   idempotency_key?: string;
   version: number;
-  status: 'draft' | 'pending_approval' | 'approved' | 'changes_requested' | 'delivered' | 'revision_requested' | 'accepted';
+  status: 'draft' | 'pending_approval' | 'approved' | 'changes_requested' | 'delivered' | 'revision_requested' | 'accepted' | 'expired';
   title: string;
   client_name: string;
   client_email: string;
@@ -45,11 +45,13 @@ export interface Proposal {
   };
   delivery?: {
     is_delivered: boolean;
-    delivered_at?: string;
+    delivered_at?: string | null;
     client_email?: string;
+    cc?: string[];
     email_subject?: string;
     email_body?: string;
     delivery_status?: string;
+    error_details?: string;
   };
   revision_request_notes?: string;
   acceptance?: {

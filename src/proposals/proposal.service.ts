@@ -600,7 +600,8 @@ export class ProposalService {
     id: string,
     actorUser: any,
     clientEmail: string,
-    reqInfo: { host?: string; protocol?: string } = {}
+    reqInfo: { host?: string; protocol?: string } = {},
+    options: { cc?: string | string[] } = {}
   ) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
@@ -608,6 +609,13 @@ export class ProposalService {
     }
 
     const actor = actorUser?.name || 'Sales Representative';
+
+    if (proposal.status === 'expired') {
+      throw new ForbiddenException({
+        error: 'Proposal Expired',
+        message: 'This proposal has expired beyond its validity timeline. Re-approval is required before client delivery.'
+      });
+    }
 
     // --- HARD APPROVAL GATE (Scenario 5) ---
     if (proposal.status !== 'approved' && proposal.approval?.status !== 'approved') {
@@ -632,55 +640,84 @@ export class ProposalService {
 
     const now = new Date().toISOString();
     const targetEmail = clientEmail || proposal.client_email;
-
-    const updated = this.storage.updateProposal(
-      id,
-      {
-        status: 'delivered',
-        delivery: {
-          is_delivered: true,
-          delivered_at: now,
-          client_email: targetEmail,
-          email_subject: formattedEmail.subject,
-          email_body: formattedEmail.body,
-          delivery_status: 'sent'
-        }
-      },
-      actor
-    );
-
-    const log = this.storage.addAuditLog(id, 'delivered', actor, {
-      recipient: targetEmail,
-      subject: formattedEmail.subject,
-      proposal_link: clientLink
-    });
-
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
-    this.invalidateCache(id);
-
-    // Push Notification: Proposal Delivered to Slack
-    this.slack.dispatchDeliveryNotification(updated, targetEmail, actor);
+    const ccList = options.cc
+      ? (Array.isArray(options.cc) ? options.cc : [options.cc])
+      : [];
 
     // Live Email Dispatch
     const emailResult = await this.emailService.sendProposalEmail({
       to: targetEmail,
-      proposal: updated,
+      cc: ccList,
+      proposal,
       clientPortalUrl: clientLink,
       subject: formattedEmail.subject,
       body: formattedEmail.body
     });
 
+    const isEmailSuccess = emailResult.success !== false;
+    const deliveryStatus = isEmailSuccess ? 'sent' : 'failed';
+
+    const updated = this.storage.updateProposal(
+      id,
+      {
+        status: isEmailSuccess ? 'delivered' : 'approved',
+        delivery: {
+          is_delivered: isEmailSuccess,
+          delivered_at: isEmailSuccess ? now : null,
+          client_email: targetEmail,
+          cc: ccList,
+          email_subject: formattedEmail.subject,
+          email_body: formattedEmail.body,
+          delivery_status: deliveryStatus,
+          error_details: isEmailSuccess ? undefined : emailResult.error
+        }
+      },
+      actor
+    );
+
+    const log = this.storage.addAuditLog(
+      id,
+      isEmailSuccess ? 'delivered' : 'delivery_failed',
+      actor,
+      {
+        recipient: targetEmail,
+        cc: ccList,
+        subject: formattedEmail.subject,
+        proposal_link: clientLink,
+        status: deliveryStatus,
+        error: isEmailSuccess ? undefined : emailResult.error
+      }
+    );
+
+    this.supabase.syncProposal(updated);
+    this.supabase.syncAuditLog(log);
+    this.invalidateCache(id);
+
+    if (isEmailSuccess) {
+      // Push Notification: Proposal Delivered to Slack
+      this.slack.dispatchDeliveryNotification(updated, targetEmail, actor);
+    } else {
+      this.slack.dispatchSystemErrorNotification(
+        'EMAIL_DELIVERY_FAILED',
+        `Proposal delivery to ${targetEmail} failed: ${emailResult.error}`,
+        { proposal_id: id, recipient: targetEmail, error: emailResult.error }
+      );
+    }
+
     return {
-      success: true,
-      message: 'Proposal successfully delivered to client.',
+      success: isEmailSuccess,
+      message: isEmailSuccess
+        ? 'Proposal successfully delivered to client.'
+        : `Email delivery failed: ${emailResult.error}. Proposal remains in approved state for retry.`,
       proposal: updated,
       delivery_details: {
         recipient: targetEmail,
+        cc: ccList,
         subject: formattedEmail.subject,
         body: formattedEmail.body,
         public_url: clientLink,
-        sent_at: now,
+        sent_at: isEmailSuccess ? now : null,
+        delivery_status: deliveryStatus,
         email_dispatch: emailResult
       }
     };
@@ -690,7 +727,13 @@ export class ProposalService {
     return this.emailService.sendDirectTestEmail(toEmail);
   }
 
-  async sendProposalEmailDirect(id: string, targetEmail: string, actor = 'Sales Rep', reqInfo: any = {}) {
+  async sendProposalEmailDirect(
+    id: string,
+    targetEmail: string,
+    actor = 'Sales Rep',
+    reqInfo: any = {},
+    options: { cc?: string | string[] } = {}
+  ) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
@@ -698,12 +741,14 @@ export class ProposalService {
     const clientLink = `${reqInfo.protocol || 'http'}://${reqInfo.host || 'localhost:3000'}/client-view.html?id=${proposal.id}`;
     const result = await this.emailService.sendProposalEmail({
       to: targetEmail || proposal.client_email,
+      cc: options.cc,
       proposal,
       clientPortalUrl: clientLink
     });
 
     const log = this.storage.addAuditLog(id, 'email_dispatched', actor, {
       recipient: targetEmail || proposal.client_email,
+      cc: options.cc,
       result
     });
     this.supabase.syncAuditLog(log);

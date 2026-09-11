@@ -53,9 +53,11 @@ export class EmailService {
     clientPortalUrl: string;
     subject?: string;
     body?: string;
+    cc?: string | string[];
   }): Promise<EmailSendResult> {
-    const { to, proposal, clientPortalUrl } = params;
+    const { to, proposal, clientPortalUrl, cc } = params;
     const recipient = to || proposal.client_email;
+    const ccDisplay = Array.isArray(cc) ? cc.join(', ') : (cc || '');
     const subject =
       params.subject ||
       `Enterprise Proposal: ${proposal.title || proposal.company_name} — Ready for Review & Sign-Off`;
@@ -98,6 +100,7 @@ export class EmailService {
         <div class="meta-row"><span class="meta-label">Account Lead:</span> <span class="meta-value">${proposal.salesperson_name || 'Sarah Chen'}</span></div>
         <div class="meta-row"><span class="meta-label">Document Version:</span> <span class="meta-value">v${proposal.version || 1}.0 (Executive Approved)</span></div>
         <div class="meta-row"><span class="meta-label">Validity Expiration:</span> <span class="meta-value">${proposal.valid_until ? new Date(proposal.valid_until).toLocaleDateString() : '30 Days from Issue'}</span></div>
+        ${ccDisplay ? `<div class="meta-row"><span class="meta-label">CC:</span> <span class="meta-value" style="font-family: monospace; font-size: 12px;">${ccDisplay}</span></div>` : ''}
       </div>
 
       <div class="btn-container">
@@ -105,6 +108,7 @@ export class EmailService {
       </div>
 
       <p style="font-size: 13px; color: #64748b;">If your team requires any scope adjustments or clarifications, you can request revisions directly via the portal link above.</p>
+      ${ccDisplay ? `<p style="font-size: 12px; color: #94a3b8;">CC Recipients: ${ccDisplay}</p>` : ''}
     </div>
     <div class="footer">
       <p>&copy; 2026 Koya Talent Inc. All rights reserved. Encrypted & digitally verified via SHA-256 tamper seals.</p>
@@ -118,7 +122,7 @@ export class EmailService {
 Proposal Delivered: ${proposal.title}
 Target Organization: ${proposal.company_name}
 Recipient: ${proposal.client_name} (${recipient})
-
+${ccDisplay ? `CC: ${ccDisplay}\n` : ''}
 View and digitally sign your proposal at:
 ${clientPortalUrl}
 
@@ -126,7 +130,7 @@ Prepared by: ${proposal.salesperson_name} — Koya Talent Inc.
     `.trim();
 
     if (!this.transporter) {
-      this.logger.log(`[SIMULATED EMAIL DISPATCH] To: ${recipient} | Subject: ${subject}`);
+      this.logger.log(`[SIMULATED EMAIL DISPATCH] To: ${recipient} | CC: ${ccDisplay || 'none'} | Subject: ${subject}`);
       return {
         success: true,
         recipient,
@@ -137,16 +141,21 @@ Prepared by: ${proposal.salesperson_name} — Koya Talent Inc.
     }
 
     try {
-      const info = await this.transporter.sendMail({
+      const mailOptions: any = {
         from: this.fromAddress,
         to: recipient,
         subject,
         text: plainText,
         html: htmlBody
-      });
+      };
+      if (cc) {
+        mailOptions.cc = cc;
+      }
+
+      const info = await this.transporter.sendMail(mailOptions);
 
       const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
-      this.logger.log(`[EMAIL DISPATCH SUCCESS] Message ID: ${info.messageId} | Recipient: ${recipient}`);
+      this.logger.log(`[EMAIL DISPATCH SUCCESS] Message ID: ${info.messageId} | Recipient: ${recipient}${ccDisplay ? ` | CC: ${ccDisplay}` : ''}`);
       if (previewUrl) {
         this.logger.log(`[EMAIL TEST PREVIEW] URL: ${previewUrl}`);
       }

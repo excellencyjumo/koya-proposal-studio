@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Enterprise NestJS & TypeScript AI Proposal Studio with Claude Haiku 4.5, Terminus Observability, Real Bcrypt Auth, and Four-Eyes Governance",
   "scripts": {
-    "build": "npm --prefix client run build && rimraf dist && tsc -p tsconfig.build.json",
-    "build:server": "rimraf dist && tsc -p tsconfig.build.json",
+    "build": "npm --prefix client run build && node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "build:server": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
     "build:client": "npm --prefix client run build",
     "start": "node dist/main.js",
     "start:dev": "ts-node src/main.ts",
@@ -44,6 +44,6 @@
     "@types/uuid": "^10.0.0",
     "rimraf": "^5.0.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3"
   }
 }

@@ -206,10 +206,18 @@ export class ProposalController {
     @CurrentUser() user: any,
     @Req() req: any
   ) {
-    return this.proposalService.deliverProposal(id, user, body?.client_email, {
-      host: req.get('host'),
-      protocol: req.protocol
-    });
+    return this.proposalService.deliverProposal(
+      id,
+      user,
+      body?.client_email,
+      {
+        host: req.get('host'),
+        protocol: req.protocol
+      },
+      {
+        cc: body?.cc
+      }
+    );
   }
 
   @Post(':id/send-email')
@@ -222,10 +230,18 @@ export class ProposalController {
     @Req() req: any
   ) {
     const actor = user?.name || 'Sales Representative';
-    return this.proposalService.sendProposalEmailDirect(id, body?.email, actor, {
-      host: req.get('host'),
-      protocol: req.protocol
-    });
+    return this.proposalService.sendProposalEmailDirect(
+      id,
+      body?.email,
+      actor,
+      {
+        host: req.get('host'),
+        protocol: req.protocol
+      },
+      {
+        cc: body?.cc
+      }
+    );
   }
 
   @Get(':id/export-eml')

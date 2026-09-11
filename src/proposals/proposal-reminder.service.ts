@@ -131,8 +131,75 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
         }
       }
 
-      // 2. Client Delivery Reminders: Approved proposals waiting to be sent to customers
+      // 2. Client Delivery Reminders & Expiration: Approved proposals waiting to be sent to customers
       if (status === 'approved') {
+        // Auto-expire approved proposals that were never delivered within validity window
+        if (proposal.valid_until) {
+          const validUntilTime = new Date(proposal.valid_until).getTime();
+          if (now > validUntilTime) {
+            this.logger.warn(`Proposal ${id} expired: Approved but never delivered before ${proposal.valid_until}`);
+            const expiredProposal = this.storage.updateProposal(id, {
+              status: 'expired',
+              approval: {
+                ...proposal.approval,
+                status: 'expired_undelivered'
+              }
+            }, 'System SLA Watchdog');
+
+            const log = this.storage.addAuditLog(id, 'proposal_expired_undelivered', 'System SLA Watchdog', {
+              reason: 'Proposal validity expired prior to customer delivery. Re-approval required.',
+              valid_until: proposal.valid_until,
+              approved_at: proposal.approval?.approved_at
+            });
+            this.supabase.syncProposal(expiredProposal);
+            this.supabase.syncAuditLog(log);
+
+            await this.slack.dispatchSystemErrorNotification(
+              'PROPOSAL_EXPIRED_UNDELIVERED',
+              `Approved proposal for ${proposal.company_name} expired prior to client delivery (${proposal.valid_until}). Re-approval required.`,
+              { proposal_id: id, company: proposal.company_name, valid_until: proposal.valid_until }
+            );
+
+            results.push({ id, type: 'proposal_expired', dispatched: true });
+            continue;
+          }
+        }
+
+        // Delivery Failure Follow-up Alert
+        if (proposal.delivery?.delivery_status === 'failed') {
+          const failCacheKey = `delivery_failed_reminder:${id}`;
+          const lastFailSent = this.lastReminderDispatch.get(failCacheKey) || 0;
+          const failCooldown = options.force ? 0 : 2 * 60 * 60 * 1000;
+
+          if (now - lastFailSent >= failCooldown) {
+            const failPayload = {
+              text: `⚠️ Action Required: Proposal Delivery Failed — ${proposal.company_name}`,
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: '⚠️ Action Required: Client Delivery Failed',
+                    emoji: true
+                  }
+                },
+                {
+                  type: 'section',
+                  fields: [
+                    { type: 'mrkdwn', text: `*Company:*\n${proposal.company_name}` },
+                    { type: 'mrkdwn', text: `*Target Recipient:*\n${proposal.delivery?.client_email || proposal.client_email}` },
+                    { type: 'mrkdwn', text: `*Error Details:*\n${proposal.delivery?.error_details || 'Email rejected'}` },
+                    { type: 'mrkdwn', text: `*Current Status:*\nApproved (Retry Ready)` }
+                  ]
+                }
+              ]
+            };
+            await (this.slack as any).postToWebhook(failPayload, '#general');
+            this.lastReminderDispatch.set(failCacheKey, now);
+            results.push({ id, type: 'delivery_failure_alert', dispatched: true });
+          }
+        }
+
         const cacheKey = `delivery_reminder:${id}`;
         const lastSent = this.lastReminderDispatch.get(cacheKey) || 0;
         const cooldown = options.force ? 0 : 4 * 60 * 60 * 1000;
