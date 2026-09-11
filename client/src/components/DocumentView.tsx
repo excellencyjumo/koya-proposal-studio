@@ -698,20 +698,20 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
               </>
             )}
 
-            {/* Approved / Delivered Controls & EML */}
-            {(isApproved || isDelivered) && (
+            {/* Approved / Delivered / Accepted Controls & EML */}
+            {(isApproved || isDelivered || isAccepted) && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleDownloadEml}
-                  className="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-750 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                  className="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
                   title="Download RFC 822 email format"
                 >
                   <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                   <span>Export .eml</span>
                 </button>
 
-                {!isDelivered ? (
+                {!isDelivered && !isAccepted ? (
                   <div className="flex items-center gap-2">
                     <input
                       type="email"
@@ -732,9 +732,13 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 dark:bg-slate-850 dark:border-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>Delivered to {proposal.delivery?.client_email || proposal.client_email}</span>
+                    <div className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                      isAccepted
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300'
+                        : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300'
+                    }`}>
+                      <CheckCircle2 className={`w-3.5 h-3.5 ${isAccepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                      <span>{isAccepted ? 'Accepted & Delivered to' : 'Delivered to'} {proposal.delivery?.client_email || proposal.client_email}</span>
                     </div>
                     <a
                       href={`/client-view.html?id=${proposal.id}`}
@@ -746,6 +750,16 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                       <ExternalLink className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                       <span>Client Sheet</span>
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => onDeliver(proposal.delivery?.client_email || proposal.client_email || targetEmail)}
+                      disabled={isProcessing}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                      title="Resend email with proposal package to client"
+                    >
+                      <Send className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                      <span>Resend</span>
+                    </button>
                     {!isRevisionRequested && !isAccepted && (
                       <button
                         type="button"

@@ -7,6 +7,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 export class ProposalReminderService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(ProposalReminderService.name);
   private timer: NodeJS.Timeout | null = null;
+  private healthTimer: NodeJS.Timeout | null = null;
   private lastReminderDispatch: Map<string, number> = new Map();
 
   constructor(
@@ -16,27 +17,42 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
   ) {}
 
   onApplicationBootstrap() {
-    this.logger.log('ProposalReminderService: Initializing background cron reminder scheduler (interval: 15m)');
+    this.logger.log('ProposalReminderService: Initializing background cron reminder scheduler (interval: 15m) and health watchdog (interval: 10m)');
     // Run initial scan after 8 seconds to allow boot completion
     setTimeout(() => {
       this.checkAndSendReminders().catch((err) => {
         this.logger.warn(`Initial reminder check failed: ${err.message}`);
       });
+      this.checkSystemHealthWatchdog().catch((err) => {
+        this.logger.warn(`Initial health watchdog check failed: ${err.message}`);
+      });
     }, 8000);
 
-    // Schedule regular check every 15 minutes
+    // Schedule regular reminder check every 15 minutes
     this.timer = setInterval(() => {
       this.checkAndSendReminders().catch((err) => {
         this.logger.warn(`Cron reminder check failed: ${err.message}`);
       });
     }, 15 * 60 * 1000);
     this.timer.unref();
+
+    // Schedule regular system health watchdog check every 10 minutes
+    this.healthTimer = setInterval(() => {
+      this.checkSystemHealthWatchdog().catch((err) => {
+        this.logger.warn(`Cron health watchdog check failed: ${err.message}`);
+      });
+    }, 10 * 60 * 1000);
+    this.healthTimer.unref();
   }
 
   onApplicationShutdown() {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = null;
     }
   }
 
@@ -240,10 +256,46 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
     };
   }
 
+  async checkSystemHealthWatchdog() {
+    try {
+      const supabaseHealth = await this.supabase.checkStatus();
+      const canWriteDb = this.storage.canWrite();
+      const memUsage = process.memoryUsage();
+      const heapUsedMB = Math.round(memUsage.heapUsed / (1024 * 1024));
+
+      const issues: string[] = [];
+      if (!canWriteDb) issues.push('Local storage is not writable');
+      if (heapUsedMB > 700) issues.push(`High memory heap usage: ${heapUsedMB}MB`);
+
+      if (issues.length > 0) {
+        this.logger.error(`System Health Watchdog detected degradation: ${issues.join(', ')}`);
+        await this.slack.dispatchSystemErrorNotification(
+          'HEALTH_WATCHDOG_DEGRADATION',
+          `Automated health watchdog detected degradation: ${issues.join('; ')}`,
+          { issues, heapUsedMB, supabaseHealth }
+        );
+        return { healthy: false, issues, timestamp: new Date().toISOString() };
+      }
+
+      this.logger.log(`System Health Watchdog: All services operational (heap: ${heapUsedMB}MB, db: writable, supabase: ${supabaseHealth.connected ? 'connected' : 'disabled'})`);
+      return { healthy: true, heapUsedMB, supabase: supabaseHealth, timestamp: new Date().toISOString() };
+    } catch (err: any) {
+      this.logger.error(`System Health Watchdog probe failed: ${err.message}`);
+      await this.slack.dispatchSystemErrorNotification(
+        'HEALTH_WATCHDOG_PROBE_ERROR',
+        `Automated health watchdog probe error: ${err.message}`,
+        { error: err.message, timestamp: new Date().toISOString() }
+      );
+      return { healthy: false, error: err.message, timestamp: new Date().toISOString() };
+    }
+  }
+
   getStatus() {
     return {
       active: Boolean(this.timer),
       interval_minutes: 15,
+      health_watchdog_active: Boolean(this.healthTimer),
+      health_interval_minutes: 10,
       cached_dispatch_count: this.lastReminderDispatch.size
     };
   }
