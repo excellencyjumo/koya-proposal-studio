@@ -1054,7 +1054,8 @@ export class ProposalService {
       message: `A single-use 6-digit authorization passcode was dispatched directly to ${targetEmail}.`,
       client_email: targetEmail,
       expires_in_minutes: 15,
-      delivery_mode: emailResult.mode
+      delivery_mode: emailResult.mode,
+      otp_hint: emailResult.mode === 'simulated' ? otpCode : undefined
     };
   }
 

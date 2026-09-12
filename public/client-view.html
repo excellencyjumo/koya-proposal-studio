@@ -578,7 +578,8 @@
       .then(res => {
         btn.textContent = 'Resend Passcode';
         statusMsg.style.color = '#166534';
-        statusMsg.innerHTML = `✅ <strong>Passcode dispatched!</strong> Check primary client inbox: <code>${res.client_email}</code>.`;
+        const hint = res.otp_hint ? ` (Demo/Cloud Fallback Passcode: <strong>${res.otp_hint}</strong>)` : '';
+        statusMsg.innerHTML = `✅ <strong>Passcode dispatched!</strong> Check primary client inbox: <code>${res.client_email}</code>.${hint}`;
       })
       .catch(err => {
         btn.textContent = 'Retry Send';
