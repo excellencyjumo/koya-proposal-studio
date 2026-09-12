@@ -177,7 +177,7 @@ export const Topbar: React.FC<TopbarProps> = ({
       ) : (
         <div className="hidden md:block">
           <span className="font-bold text-slate-900 dark:text-white text-sm tracking-tight">
-            Proposals Directory
+            {user ? 'Proposals Directory' : 'Koya Talent Enterprise'}
           </span>
         </div>
       )}
@@ -185,14 +185,16 @@ export const Topbar: React.FC<TopbarProps> = ({
       {/* Right: Only Essentials — New Proposal, Dashboard, Tools Dropdown, Theme Toggle, User */}
       <div className="flex items-center gap-2 sm:gap-2.5">
         
-        {/* Primary Action: + New Proposal */}
-        <button
-          onClick={onOpenNewProposal}
-          className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-semibold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Proposal</span>
-        </button>
+        {/* Primary Action: + New Proposal (Strictly authenticated) */}
+        {user && (
+          <button
+            onClick={onOpenNewProposal}
+            className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-semibold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Proposal</span>
+          </button>
+        )}
 
         {/* Return to Dashboard (if viewing a proposal) */}
         {user && currentProposal && (
@@ -224,22 +226,6 @@ export const Topbar: React.FC<TopbarProps> = ({
                 <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800/80 mb-1">
                   Governance & Delivery
                 </div>
-
-                {currentProposal && (
-                  <button
-                    onClick={() => {
-                      onToggleClientView();
-                      setToolsOpen(false);
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80 flex items-center gap-2.5 transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    <div>
-                      <div className="font-semibold">{isClientView ? 'Close Client View' : 'Client Portal View'}</div>
-                      <div className="text-[10px] text-slate-400">Sanitized client-facing preview</div>
-                    </div>
-                  </button>
-                )}
 
                 <button
                   onClick={() => {

@@ -38,6 +38,31 @@ export class ProposalService {
   }
 
 
+  isInternalStaffEmail(email?: string): boolean {
+    if (!email) return false;
+    const normalized = email.trim().toLowerCase();
+
+    // 1. Corporate domain
+    if (normalized.endsWith('@koyatalent.com')) return true;
+
+    // 2. Registered users in storage
+    const users = this.storage.getUsers() || [];
+    if (users.some(u => u.email && u.email.toLowerCase().trim() === normalized)) {
+      return true;
+    }
+
+    // 3. Known internal manager / sales staff emails
+    const internalList = [
+      'excellencejumo@gmail.com',
+      'excellencyjumo@outlook.com',
+      'excellencejumo@outlook.com',
+      'sarah.chen@koyatalent.com',
+      'marcus.vance@koyatalent.com',
+      'elena.rostova@koyatalent.com'
+    ];
+    return internalList.includes(normalized);
+  }
+
   async generateProposal(
     intakeData: Record<string, any>,
     supportingMaterial = '',
@@ -47,6 +72,12 @@ export class ProposalService {
   ) {
     if (!intakeData) {
       throw new BadRequestException('Missing required field: intake_data');
+    }
+
+    if (intakeData.client_email && this.isInternalStaffEmail(intakeData.client_email)) {
+      throw new BadRequestException(
+        `Segregation of Duties Violation: '${intakeData.client_email}' is an internal management/sales staff email. Client email must belong to an external customer.`
+      );
     }
 
     if (supportingMaterial && supportingMaterial.length > 50000) {
@@ -82,7 +113,7 @@ export class ProposalService {
       salesperson_name: intakeData.salesperson_name || user?.name || 'Sarah Chen',
       created_by_user_id: user?.id || 'usr_sales_01',
       date_of_call: intakeData.date_of_call,
-      title: generated.title || `Proposal for ${intakeData.company_name || 'Client'}`,
+      title: (intakeData.title && intakeData.title.trim()) || generated.title || `Proposal for ${intakeData.company_name || 'Client'}`,
       intake_data: intakeData,
       supporting_material: supportingMaterial || '',
       has_gaps: generated.has_gaps,
@@ -432,7 +463,12 @@ export class ProposalService {
     };
   }
 
-  async approveProposal(id: string, approver: any, feedbackNotes?: string) {
+  async approveProposal(
+    id: string,
+    approver: any,
+    feedbackNotes?: string,
+    reqInfo?: { host?: string; protocol?: string }
+  ) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
@@ -531,7 +567,10 @@ export class ProposalService {
     // Automated Email Dispatch to Sales Rep with CC to Approving Manager & Admin
     const salesEmail = (updated.salesperson_name === 'Sarah Chen' ? 'sarah.chen@koyatalent.com' : 'sarah.chen@koyatalent.com');
     const managerEmail = approver?.email || (approverName === 'Marcus Vance' ? 'marcus.vance@koyatalent.com' : 'elena.rostova@koyatalent.com');
-    const clientLink = `http://localhost:3000/proposals/${updated.id}`;
+    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
+      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
+      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const clientLink = `${publicBase}/client-view.html?id=${updated.id}`;
 
     const approvalEmailResult = await this.emailService.sendApprovalEmail({
       proposal: updated,
@@ -635,11 +674,23 @@ export class ProposalService {
       });
     }
 
-    const clientLink = `${reqInfo.protocol || 'http'}://${reqInfo.host || 'localhost:3000'}/client-view.html?id=${proposal.id}`;
+    const publicBase = (reqInfo.host && !reqInfo.host.includes('localhost'))
+      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
+      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const clientToken = this.storage.getClientAccessToken(proposal);
+    const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const formattedEmail = this.claude.formatClientEmail(proposal, clientLink);
 
     const now = new Date().toISOString();
     const targetEmail = clientEmail || proposal.client_email;
+    if (!targetEmail) {
+      throw new BadRequestException('Recipient client email is required for delivery.');
+    }
+    if (this.isInternalStaffEmail(targetEmail)) {
+      throw new BadRequestException(
+        `Segregation of Duties Violation: Cannot deliver proposal to internal staff email '${targetEmail}'. Proposals must be issued to an external customer email.`
+      );
+    }
     const ccList = options.cc
       ? (Array.isArray(options.cc) ? options.cc : [options.cc])
       : [];
@@ -738,7 +789,11 @@ export class ProposalService {
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
     }
-    const clientLink = `${reqInfo.protocol || 'http'}://${reqInfo.host || 'localhost:3000'}/client-view.html?id=${proposal.id}`;
+    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
+      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
+      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const clientToken = this.storage.getClientAccessToken(proposal);
+    const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const result = await this.emailService.sendProposalEmail({
       to: targetEmail || proposal.client_email,
       cc: options.cc,
@@ -755,10 +810,22 @@ export class ProposalService {
     return result;
   }
 
-  async requestClientRevision(id: string, feedback: string, actor = 'Sarah Chen') {
+  async requestClientRevision(id: string, feedback: string, actor = 'Sarah Chen', token?: string) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
+    }
+
+    const expectedToken = this.storage.getClientAccessToken(proposal);
+    if (!token || token.trim() !== expectedToken) {
+      throw new ForbiddenException({
+        error: 'Unauthorized Access',
+        message: 'A valid cryptographic client access token is required to request revisions.'
+      });
+    }
+
+    if (proposal.status !== 'delivered') {
+      throw new BadRequestException(`Client revisions can only be requested for delivered proposals. Current status: ${proposal.status}`);
     }
 
     const updated = this.storage.updateProposal(
@@ -855,7 +922,11 @@ export class ProposalService {
       throw new NotFoundException('Proposal not found');
     }
 
-    const clientLink = `${reqInfo.protocol || 'http'}://${reqInfo.host || 'localhost:3000'}/client-view.html?id=${proposal.id}`;
+    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
+      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
+      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const clientToken = this.storage.getClientAccessToken(proposal);
+    const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const emailData = this.claude.formatClientEmail(proposal, clientLink);
 
     const recipient = proposal.client_email || 'client@company.com';
@@ -881,7 +952,7 @@ export class ProposalService {
     };
   }
 
-  getPublicView(id: string) {
+  getPublicView(id: string, token?: string) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException('Proposal not found');
@@ -889,6 +960,8 @@ export class ProposalService {
 
     const validUntil = proposal.valid_until || new Date(Date.now() + 30 * 86400000).toISOString();
     const isExpired = new Date() > new Date(validUntil);
+    const clientToken = this.storage.getClientAccessToken(proposal);
+    const isAuthorizedClient = Boolean(token && token.trim() === clientToken);
 
     return {
       success: true,
@@ -902,11 +975,90 @@ export class ProposalService {
       is_expired: isExpired,
       status: proposal.status,
       acceptance: proposal.acceptance || null,
-      sections: proposal.sections
+      sections: proposal.sections,
+      client_email: proposal.client_email,
+      is_authorized_client: isAuthorizedClient
     };
   }
 
-  async acceptProposal(id: string, signerName: string, signerTitle = 'Authorized Representative') {
+  async sendSigningOtp(id: string, token?: string) {
+    const proposal = this.storage.getProposalById(id);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${id} not found`);
+    }
+
+    const expectedToken = this.storage.getClientAccessToken(proposal);
+    if (!token || token.trim() !== expectedToken) {
+      throw new ForbiddenException({
+        error: 'Unauthorized Access',
+        message: 'A valid client access token is required to request a signing authorization passcode.'
+      });
+    }
+
+    if (proposal.status === 'accepted') {
+      throw new BadRequestException('This proposal has already been digitally executed and accepted.');
+    }
+
+    if (proposal.status !== 'delivered') {
+      throw new BadRequestException(`Signing passcodes can only be requested for delivered proposals (current status: ${proposal.status}).`);
+    }
+
+    if (proposal.valid_until && new Date() > new Date(proposal.valid_until)) {
+      throw new ConflictException('This proposal has expired beyond its 30-day validity window.');
+    }
+
+    // Generate random 6-digit passcode
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    const updatedProposal = this.storage.updateProposal(
+      id,
+      {
+        signing_otp: {
+          code: otpCode,
+          expires_at: expiresAt,
+          generated_at: new Date().toISOString()
+        }
+      } as any,
+      'System (Client Portal OTP)'
+    );
+
+    const targetEmail = proposal.client_email;
+    if (!targetEmail) {
+      throw new BadRequestException('Proposal does not have a client email specified.');
+    }
+    if (this.isInternalStaffEmail(targetEmail)) {
+      throw new BadRequestException(
+        `Security Policy: Cannot dispatch client signing OTP to internal staff email '${targetEmail}'. Proposals must be authorized by an external client.`
+      );
+    }
+
+    // Log in audit log
+    const auditLog = this.storage.addAuditLog(id, 'signing_otp_dispatched', targetEmail, {
+      client_email: targetEmail,
+      expires_at: expiresAt,
+      security_protocol: 'exclusive_primary_recipient_no_cc'
+    });
+    this.supabase.syncAuditLog(auditLog);
+
+    // Live dispatch email strictly to client email (no CC)
+    const emailResult = await this.emailService.sendSigningOtpEmail({
+      to: targetEmail,
+      proposal,
+      otpCode,
+      expiresInMinutes: 15
+    });
+
+    return {
+      success: true,
+      message: `A single-use 6-digit authorization passcode was dispatched directly to ${targetEmail}.`,
+      client_email: targetEmail,
+      expires_in_minutes: 15,
+      delivery_mode: emailResult.mode
+    };
+  }
+
+  async acceptProposal(id: string, signerName: string, signerTitle = 'Authorized Representative', token?: string, otp?: string) {
     if (!signerName || !signerName.trim()) {
       throw new BadRequestException('Signer full name is required for legal acceptance.');
     }
@@ -916,9 +1068,42 @@ export class ProposalService {
       throw new NotFoundException(`Proposal ${id} not found`);
     }
 
+    const expectedToken = this.storage.getClientAccessToken(proposal);
+    if (!token || token.trim() !== expectedToken) {
+      throw new ForbiddenException({
+        error: 'Unauthorized Access',
+        message: 'A valid cryptographic client access token is required to digitally sign this proposal.'
+      });
+    }
+
     // Check expiration
     if (proposal.valid_until && new Date() > new Date(proposal.valid_until)) {
       throw new ConflictException('This proposal has expired beyond its 30-day validity window. Please contact your sales representative for an updated proposal.');
+    }
+
+    if (proposal.status !== 'delivered' && proposal.status !== 'accepted') {
+      throw new BadRequestException(`Proposal cannot be accepted in '${proposal.status}' status. It must be approved and delivered to the client first.`);
+    }
+
+    // Validate OTP challenge - Strictly mandatory for client digital execution
+    const signingOtp = (proposal as any).signing_otp;
+    if (!signingOtp || !signingOtp.code) {
+      throw new BadRequestException('A 6-digit client authorization passcode (OTP) is required. Please click "Send Passcode to Inbox" to generate and verify your code.');
+    }
+
+    if (!otp || !otp.trim()) {
+      throw new BadRequestException('A 6-digit authorization passcode is required to digitally sign this proposal. Please enter the passcode sent to your client inbox.');
+    }
+
+    const cleanOtp = otp.trim();
+    const isExpired = signingOtp.expires_at && new Date() > new Date(signingOtp.expires_at);
+
+    if (cleanOtp !== signingOtp.code) {
+      throw new BadRequestException(`Invalid authorization passcode '${cleanOtp}'. Please check the 6-digit code sent to ${proposal.client_email} or request a new one.`);
+    }
+
+    if (isExpired) {
+      throw new BadRequestException('This authorization passcode has expired. Please click "Send Passcode to Inbox" to generate a new passcode.');
     }
 
     const trimmedName = signerName.trim();
@@ -934,7 +1119,8 @@ export class ProposalService {
       accepted_by_name: trimmedName,
       accepted_by_title: trimmedTitle,
       accepted_at: now,
-      signature_hash: signatureHash
+      signature_hash: signatureHash,
+      otp_verified: Boolean(signingOtp?.code)
     };
 
     const updated = this.storage.updateProposal(
@@ -946,12 +1132,21 @@ export class ProposalService {
       trimmedName
     );
 
+    if (signingOtp?.code) {
+      this.storage.addAuditLog(id, 'client_otp_verified', trimmedName, {
+        signer_name: trimmedName,
+        client_email: proposal.client_email,
+        verified_at: now
+      });
+    }
+
     const log = this.storage.addAuditLog(id, 'proposal_accepted_by_client', trimmedName, {
       signer_name: trimmedName,
       signer_title: trimmedTitle,
       signature_hash: signatureHash,
       accepted_at: now,
-      previous_status: proposal.status
+      previous_status: proposal.status,
+      otp_verified: Boolean(signingOtp?.code)
     });
 
     this.supabase.syncProposal(updated);

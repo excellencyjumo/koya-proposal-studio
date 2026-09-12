@@ -711,7 +711,7 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                   <span>Export .eml</span>
                 </button>
 
-                {!isDelivered && !isAccepted ? (
+                {!isDelivered && !isAccepted && (
                   <div className="flex items-center gap-2">
                     <input
                       type="email"
@@ -730,26 +730,11 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                       <span>Deliver to Client</span>
                     </button>
                   </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
-                      isAccepted
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300'
-                        : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300'
-                    }`}>
-                      <CheckCircle2 className={`w-3.5 h-3.5 ${isAccepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`} />
-                      <span>{isAccepted ? 'Accepted & Delivered to' : 'Delivered to'} {proposal.delivery?.client_email || proposal.client_email}</span>
-                    </div>
-                    <a
-                      href={`/client-view.html?id=${proposal.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
-                      title="View the official print/PDF proposal sheet sent to the client"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-                      <span>Client Sheet</span>
-                    </a>
+                )}
+
+                {/* Delivered (not yet accepted): Allow Resend and Revision Request */}
+                {isDelivered && !isAccepted && (
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onDeliver(proposal.delivery?.client_email || proposal.client_email || targetEmail)}
@@ -760,7 +745,7 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
                       <Send className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                       <span>Resend</span>
                     </button>
-                    {!isRevisionRequested && !isAccepted && (
+                    {!isRevisionRequested && (
                       <button
                         type="button"
                         onClick={() => setIsRevisionModalOpen(true)}
@@ -776,32 +761,17 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
               </div>
             )}
 
-            {/* Version Diff Comparison Trigger */}
-            {proposal.version > 1 && (
-              <button
-                type="button"
-                onClick={() => setIsDiffModalOpen(true)}
-                className="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-                title="Compare line-by-line changes against previous versions"
-              >
-                <FileCode2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-                <span>Compare Versions</span>
-              </button>
-            )}
-
-            {/* View Digital Seal Button if Accepted */}
-            {isAccepted && (
-              <a
-                href={`/client-view.html?id=${proposal.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
-                title="View the official accepted client agreement"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>View Digital Seal</span>
-              </a>
-            )}
+            {/* Universal Client Sheet Button: Visible across all states */}
+            <a
+              href={`/client-view.html?id=${proposal.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+              title="View internal staff preview of client proposal sheet"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+              <span>Client Sheet</span>
+            </a>
           </div>
         </div>
 

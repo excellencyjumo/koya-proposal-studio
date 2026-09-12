@@ -312,6 +312,117 @@ ${clientPortalUrl}
     }
   }
 
+  async sendSigningOtpEmail(params: {
+    to: string;
+    proposal: any;
+    otpCode: string;
+    expiresInMinutes?: number;
+  }): Promise<EmailSendResult> {
+    const { to, proposal, otpCode, expiresInMinutes = 15 } = params;
+    const recipient = to || proposal.client_email;
+    const subject = `🔐 Koya Security Passcode: ${otpCode} for Proposal Signature Authorization`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: #0f172a; color: #ffffff; padding: 24px 32px; text-align: center; }
+    .header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.025em; }
+    .content { padding: 32px; text-align: center; }
+    .otp-box { background: #f0fdf4; border: 2px dashed #22c55e; border-radius: 12px; padding: 20px; margin: 24px 0; display: inline-block; width: 80%; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 0.25em; color: #15803d; }
+    .warning-text { font-size: 12.5px; color: #64748b; margin-top: 16px; line-height: 1.5; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 32px; font-size: 11px; color: #94a3b8; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Koya Talent Enterprise Security Gate</h1>
+      <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 12px;">Two-Factor Authorization for Proposal Acceptance</p>
+    </div>
+    <div class="content">
+      <p style="font-size: 14px; color: #334155; margin-bottom: 8px;">
+        A request has been initiated to digitally execute the proposal for <strong>${proposal.company_name}</strong>.
+      </p>
+      <p style="font-size: 13px; color: #64748b;">
+        Please enter the single-use passcode below in the client portal to authorize signature:
+      </p>
+      <div class="otp-box">
+        <div class="otp-code">${otpCode}</div>
+        <div style="font-size: 12px; color: #166534; font-weight: 600; margin-top: 6px;">Valid for ${expiresInMinutes} Minutes</div>
+      </div>
+      <p class="warning-text">
+        🔒 <strong>Security Notice:</strong> This authorization passcode was dispatched strictly to the verified client email address (<code>${recipient}</code>). Internal staff and CC recipients cannot authorize execution without this code.
+      </p>
+    </div>
+    <div class="footer">
+      &copy; 2026 Koya Talent Inc. Cryptographic signing protocol compliant with eIDAS & ESIGN standards.
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const plainText = `
+Koya Talent Enterprise Security Gate
+One-Time Authorization Passcode for Proposal Execution
+
+Proposal: ${proposal.title}
+Client: ${proposal.company_name}
+Recipient: ${recipient}
+
+YOUR 6-DIGIT VERIFICATION CODE: ${otpCode}
+(This code is valid for ${expiresInMinutes} minutes)
+
+Security Notice: This passcode is sent exclusively to the primary client recipient to prevent unauthorized sign-offs.
+    `.trim();
+
+    if (!this.transporter) {
+      this.logger.log(`[SIMULATED OTP DISPATCH] To: ${recipient} | Code: ${otpCode} | Subject: ${subject}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        mode: 'simulated',
+        messageId: `otp_sim_${Date.now()}`
+      };
+    }
+
+    try {
+      const mailOptions: any = {
+        from: this.fromAddress,
+        to: recipient,
+        subject,
+        text: plainText,
+        html: htmlBody
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`[OTP DISPATCH SUCCESS] Message ID: ${info.messageId} | Recipient: ${recipient} | Code: ${otpCode}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        messageId: info.messageId,
+        mode: this.mode
+      };
+    } catch (err: any) {
+      this.logger.error(`[OTP DISPATCH ERROR] Failed to send OTP to ${recipient}: ${err.message}`);
+      return {
+        success: false,
+        recipient,
+        subject,
+        mode: this.mode,
+        error: err.message
+      };
+    }
+  }
+
   async sendDirectTestEmail(toEmail: string): Promise<EmailSendResult> {
     const dummyProposal = {
       id: 'prop_test_email_verification',

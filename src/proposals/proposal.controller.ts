@@ -179,9 +179,13 @@ export class ProposalController {
   approve(
     @Param('id') id: string,
     @Body() body: any,
-    @CurrentUser() user: any
+    @CurrentUser() user: any,
+    @Req() req: any
   ) {
-    return this.proposalService.approveProposal(id, user, body?.feedback_notes);
+    return this.proposalService.approveProposal(id, user, body?.feedback_notes, {
+      host: req.get('host'),
+      protocol: req.protocol
+    });
   }
 
   @Post(':id/request-changes')
@@ -257,8 +261,18 @@ export class ProposalController {
   }
 
   @Get(':id/public')
-  getPublic(@Param('id') id: string) {
-    return this.proposalService.getPublicView(id);
+  getPublic(@Param('id') id: string, @Query('token') token?: string) {
+    return this.proposalService.getPublicView(id, token);
+  }
+
+  @Post(':id/send-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendSigningOtp(
+    @Param('id') id: string,
+    @Body() body: any
+  ) {
+    const token = body?.token;
+    return this.proposalService.sendSigningOtp(id, token);
   }
 
   @Post(':id/accept')
@@ -269,7 +283,9 @@ export class ProposalController {
   ) {
     const signerName = body?.signer_name || body?.name || body?.signerName;
     const signerTitle = body?.signer_title || body?.title || body?.signerTitle;
-    return this.proposalService.acceptProposal(id, signerName, signerTitle);
+    const token = body?.token;
+    const otp = body?.otp || body?.code;
+    return this.proposalService.acceptProposal(id, signerName, signerTitle, token, otp);
   }
 
   @Get(':id/export-audit-csv')
@@ -289,7 +305,8 @@ export class ProposalController {
   ) {
     const feedback = body?.client_feedback || body?.feedback || 'Customer requested revisions to proposal scope or terms.';
     const actor = body?.actor || user?.name || 'Sarah Chen';
-    return this.proposalService.requestClientRevision(id, feedback, actor);
+    const token = body?.token;
+    return this.proposalService.requestClientRevision(id, feedback, actor, token);
   }
 
   @Post(':id/approve-revision-unlock')

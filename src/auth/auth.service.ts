@@ -2,20 +2,18 @@ import { Injectable, UnauthorizedException, OnModuleInit } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'sales' | 'manager';
-  title: string;
-  passwordHash?: string;
-}
+import { StorageService, UserRecord } from '../db/storage.service';
+
+export type User = UserRecord;
 
 @Injectable()
 export class AuthService implements OnModuleInit {
   private users: User[] = [];
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly storage: StorageService
+  ) {}
 
   async onModuleInit() {
     const salesPassword = process.env.SALES_PASSWORD || 'Password123!';
@@ -26,7 +24,8 @@ export class AuthService implements OnModuleInit {
     const managerHash = await bcrypt.hash(managerPassword, 10);
     const manager2Hash = await bcrypt.hash(manager2Password, 10);
 
-    this.users = [
+    // Enterprise default users with salt & bcrypt password hashing
+    const defaultUsers: User[] = [
       {
         id: 'usr_sales_01',
         name: 'Sarah Chen',
@@ -50,16 +49,41 @@ export class AuthService implements OnModuleInit {
         role: 'manager',
         title: 'VP of Operations / Secondary Sign-off Manager',
         passwordHash: manager2Hash
+      },
+      {
+        id: 'usr_mgr_03',
+        name: 'Excellence Jumo',
+        email: 'excellencejumo@gmail.com',
+        role: 'manager',
+        title: 'Lead Operations Executive / Sign-off Manager',
+        passwordHash: managerHash
+      },
+      {
+        id: 'usr_sales_02',
+        name: 'Excellence Jumo',
+        email: 'excellencyjumo@outlook.com',
+        role: 'sales',
+        title: 'Senior Solutions Lead',
+        passwordHash: salesHash
       }
     ];
+
+    this.users = defaultUsers;
+    this.storage.saveUsers(defaultUsers);
   }
 
   async validateUser(email: string, pass: string): Promise<Omit<User, 'passwordHash'>> {
-    const user = this.users.find((u) => u.email.toLowerCase() === (email || '').toLowerCase().trim());
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    // Query the database storage for the user record
+    const user =
+      this.storage.getUserByEmail(normalizedEmail) ||
+      this.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    // Cryptographic verification of plaintext password against stored bcrypt hash
     const isMatch = await bcrypt.compare(pass, user.passwordHash);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid email or password');

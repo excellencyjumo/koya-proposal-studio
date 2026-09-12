@@ -4,11 +4,21 @@ import { Injectable, Logger } from '@nestjs/common';
 export class SlackService {
   private readonly logger = new Logger(SlackService.name);
 
+  private getBaseUrl(options: { host?: string; protocol?: string } = {}): string {
+    if (options.host && !options.host.includes('localhost')) {
+      return `${options.protocol || 'https'}://${options.host}`;
+    }
+    const envUrl = process.env.PUBLIC_APP_URL;
+    if (envUrl && envUrl.startsWith('http')) {
+      return envUrl.replace(/\/+$/, '');
+    }
+    return 'https://3f57-102-88-167-104.ngrok-free.app';
+  }
+
   buildSlackPayload(proposal: any, options: { host?: string; protocol?: string; actor?: string } = {}) {
-    const protocol = options.protocol || 'http';
-    const host = options.host || 'localhost:3000';
-    const reviewUrl = `${protocol}://${host}/proposals/${proposal.id}`;
-    const clientUrl = `${protocol}://${host}/client-view.html?id=${proposal.id}`;
+    const baseUrl = this.getBaseUrl(options);
+    const reviewUrl = `${baseUrl}/proposals/${proposal.id}`;
+    const clientUrl = `${baseUrl}/client-view.html?id=${proposal.id}`;
 
     const clientName = proposal.client_name || 'Client';
     const companyName = proposal.company_name || 'Organization';
@@ -97,6 +107,9 @@ export class SlackService {
   }
 
   buildApprovalPayload(proposal: any, approverName: string, notes?: string) {
+    const baseUrl = this.getBaseUrl();
+    const clientUrl = `${baseUrl}/client-view.html?id=${proposal.id}`;
+
     return {
       text: `Proposal Approved: ${proposal.company_name} (v${proposal.version})`,
       blocks: [
@@ -123,6 +136,21 @@ export class SlackService {
             type: 'mrkdwn',
             text: `*Manager Notes:*\n>${notes || 'All commercial milestones and deliverables verified.'}`
           }
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: 'Open Proposal Document',
+                emoji: true
+              },
+              style: 'primary',
+              url: clientUrl
+            }
+          ]
         }
       ]
     };
@@ -160,6 +188,9 @@ export class SlackService {
   }
 
   buildDeliveryPayload(proposal: any, clientEmail: string, actor: string) {
+    const baseUrl = this.getBaseUrl();
+    const clientUrl = `${baseUrl}/client-view.html?id=${proposal.id}`;
+
     return {
       text: `Proposal Delivered to ${clientEmail}`,
       blocks: [
@@ -178,6 +209,21 @@ export class SlackService {
             { type: 'mrkdwn', text: `*Company:*\n${proposal.company_name}` },
             { type: 'mrkdwn', text: `*Delivered By:*\n${actor}` },
             { type: 'mrkdwn', text: `*Document State:*\nLocked & Immutable` }
+          ]
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: 'Open Client Proposal Sheet',
+                emoji: true
+              },
+              style: 'primary',
+              url: clientUrl
+            }
           ]
         }
       ]
@@ -507,6 +553,9 @@ export class SlackService {
 
   buildProposalWonPayload(proposal: any, signerName: string, signerTitle?: string) {
     const clientTitle = signerTitle || 'Authorized Executive';
+    const baseUrl = this.getBaseUrl();
+    const clientUrl = `${baseUrl}/client-view.html?id=${proposal.id}`;
+
     return {
       text: `🎉 Deal Won! Proposal Accepted: ${proposal.company_name} (${signerName})`,
       blocks: [
@@ -533,6 +582,21 @@ export class SlackService {
             type: 'mrkdwn',
             text: `*Status:* Proposal has transitioned to *Accepted & Executed*. Commercial terms and delivery schedule locked.`
           }
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: 'View Digitally Signed Agreement',
+                emoji: true
+              },
+              style: 'primary',
+              url: clientUrl
+            }
+          ]
         }
       ]
     };

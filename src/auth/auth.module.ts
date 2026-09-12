@@ -6,8 +6,11 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 
+import { DbModule } from '../db/db.module';
+
 @Module({
   imports: [
+    DbModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'koya_enterprise_jwt_secret_2026_secure_key',

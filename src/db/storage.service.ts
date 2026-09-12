@@ -3,6 +3,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: 'sales' | 'manager';
+  title: string;
+  passwordHash: string;
+}
+
 export interface AuditLog {
   id: string;
   proposal_id: string;
@@ -60,6 +69,7 @@ export interface Proposal {
     accepted_at: string;
     signature_hash?: string;
   };
+  client_access_token?: string;
   created_at: string;
   updated_at: string;
 }
@@ -70,7 +80,7 @@ export class StorageService {
   private readonly dataDir: string;
   private readonly dbFile: string;
   private writeQueue: Promise<void> = Promise.resolve();
-  private cache: { proposals: Proposal[]; audit_logs: AuditLog[] };
+  private cache: { proposals: Proposal[]; audit_logs: AuditLog[]; users: UserRecord[] };
 
   constructor() {
     this.dataDir = path.join(process.cwd(), 'data');
@@ -83,16 +93,36 @@ export class StorageService {
     this.cache = this.loadDatabase();
   }
 
-  private loadDatabase(): { proposals: Proposal[]; audit_logs: AuditLog[] } {
+  private loadDatabase(): { proposals: Proposal[]; audit_logs: AuditLog[]; users: UserRecord[] } {
     try {
       if (fs.existsSync(this.dbFile)) {
         const raw = fs.readFileSync(this.dbFile, 'utf8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        return {
+          proposals: parsed.proposals || [],
+          audit_logs: parsed.audit_logs || [],
+          users: parsed.users || []
+        };
       }
     } catch (err: any) {
       this.logger.error(`Error loading database file: ${err.message}. Initializing fresh defaults.`);
     }
-    return { proposals: [], audit_logs: [] };
+    return { proposals: [], audit_logs: [], users: [] };
+  }
+
+  getUsers(): UserRecord[] {
+    return this.cache.users || [];
+  }
+
+  getUserByEmail(email: string): UserRecord | undefined {
+    return (this.cache.users || []).find(
+      (u) => u.email.toLowerCase() === (email || '').toLowerCase().trim()
+    );
+  }
+
+  saveUsers(users: UserRecord[]): void {
+    this.cache.users = users;
+    this.queueSave();
   }
 
   private queueSave(): Promise<void> {
@@ -151,8 +181,15 @@ export class StorageService {
     validUntilDate.setDate(validUntilDate.getDate() + 30);
     const valid_until = data.valid_until || validUntilDate.toISOString();
 
+    const client_access_token = crypto
+      .createHmac('sha256', process.env.JWT_SECRET || 'koya_enterprise_jwt_secret_2026_secure_key')
+      .update(`${id}:${data.client_email || 'client'}`)
+      .digest('hex')
+      .substring(0, 32);
+
     const newProposal: Proposal = {
       id,
+      client_access_token,
       idempotency_key: data.idempotency_key,
       version: 1,
       status: 'draft',
@@ -203,6 +240,15 @@ export class StorageService {
     });
 
     return newProposal;
+  }
+
+  getClientAccessToken(proposal: Proposal): string {
+    if (proposal.client_access_token) return proposal.client_access_token;
+    return crypto
+      .createHmac('sha256', process.env.JWT_SECRET || 'koya_enterprise_jwt_secret_2026_secure_key')
+      .update(`${proposal.id}:${proposal.client_email || 'client'}`)
+      .digest('hex')
+      .substring(0, 32);
   }
 
   updateProposal(id: string, updates: Partial<Proposal>, actor: string): Proposal | null {

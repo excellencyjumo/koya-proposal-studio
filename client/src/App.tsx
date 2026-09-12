@@ -102,6 +102,10 @@ export const App: React.FC = () => {
   };
 
   const handleOpenNewProposal = () => {
+    if (!user) {
+      showNotification('Please sign in to create a proposal.', 'error');
+      return;
+    }
     setIsIntakeOpen(true);
     window.history.pushState({ newProposal: true }, '', '/new');
   };
@@ -483,28 +487,32 @@ export const App: React.FC = () => {
         </div>
       </footer>
 
-      {/* Modals & Drawers */}
-      <IntakeModal
-        isOpen={isIntakeOpen}
-        onClose={handleCloseNewProposal}
-        onGenerate={handleGenerate}
-        isGenerating={isGenerating}
-        activeGaps={currentProposal?.gaps}
-      />
+      {/* Modals & Drawers (Exclusively rendered when authenticated) */}
+      {user && (
+        <>
+          <IntakeModal
+            isOpen={isIntakeOpen}
+            onClose={handleCloseNewProposal}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            activeGaps={currentProposal?.gaps}
+          />
 
-      <AuditDrawer
-        isOpen={isAuditOpen}
-        onClose={() => setIsAuditOpen(false)}
-        auditLogs={auditLogs}
-        proposalId={currentProposal?.id}
-      />
+          <AuditDrawer
+            isOpen={isAuditOpen}
+            onClose={() => setIsAuditOpen(false)}
+            auditLogs={auditLogs}
+            proposalId={currentProposal?.id}
+          />
 
-      <SlackModal
-        isOpen={isSlackOpen}
-        onClose={() => setIsSlackOpen(false)}
-        proposal={currentProposal}
-        lastDispatch={lastSlackDispatch}
-      />
+          <SlackModal
+            isOpen={isSlackOpen}
+            onClose={() => setIsSlackOpen(false)}
+            proposal={currentProposal}
+            lastDispatch={lastSlackDispatch}
+          />
+        </>
+      )}
 
       <LoginModal />
     </div>

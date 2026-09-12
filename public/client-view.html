@@ -352,10 +352,13 @@
 <body>
 
   <div class="top-bar">
-    <a href="/" class="brand-link">← Return to Studio</a>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <a href="/" class="brand-link">← Return to Studio</a>
+      <span id="staff-preview-badge" style="display: none; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em;">👔 Internal Staff Preview (Read-Only)</span>
+    </div>
     <div class="action-group">
-      <button class="btn btn-emerald" id="btn-top-accept" onclick="openAcceptModal()">✍️ Accept & Sign Proposal</button>
-      <button class="btn btn-secondary" id="btn-top-revision" onclick="openFeedbackModal()">💬 Request Revisions</button>
+      <button class="btn btn-emerald" id="btn-top-accept" style="display: none;" onclick="openAcceptModal()">✍️ Accept & Sign Proposal</button>
+      <button class="btn btn-secondary" id="btn-top-revision" style="display: none;" onclick="openFeedbackModal()">💬 Request Revisions</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
     </div>
   </div>
@@ -458,11 +461,11 @@
         <span style="font-size: 24px;">✍️</span>
         <div>
           <h3 style="font-size: 18px; font-weight: 700; color: var(--slate-900);">Accept & Digitally Sign Proposal</h3>
-          <p style="font-size: 12px; color: var(--slate-500);">Enterprise Dual-Authorization & Execution Protocol</p>
+          <p style="font-size: 12px; color: var(--slate-500);">Enterprise Dual-Authorization & Two-Factor Verification Protocol</p>
         </div>
       </div>
       <p style="font-size: 13px; color: var(--slate-600); margin-bottom: 16px;">
-        By submitting this digital signature, you confirm executive authorization to execute this agreement and accept the deliverables, milestones, and commercial terms outlined above.
+        By submitting this digital signature, you confirm executive authorization to execute this agreement. To ensure full cryptographic security and prevent unauthorized sign-offs by internal staff or CC recipients, an authorization passcode challenge is enforced.
       </p>
 
       <div class="form-group">
@@ -473,6 +476,25 @@
       <div class="form-group">
         <label class="form-label" for="accept-title-input">Corporate Title / Role *</label>
         <input type="text" id="accept-title-input" class="form-input" placeholder="e.g. Chief Technology Officer / VP Engineering" />
+      </div>
+
+      <!-- OTP Two-Factor Verification Challenge -->
+      <div style="margin: 16px 0; padding: 14px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label style="font-size: 12.5px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin: 0;">
+            <span>🔑</span> Client Authorization Passcode (OTP) *
+          </label>
+          <button type="button" class="btn btn-secondary" id="btn-request-otp" onclick="requestSigningOtp()" style="padding: 4px 10px; font-size: 11.5px; height: 28px; background: #ffffff; color: #15803d; border-color: #86efac;">
+            Send Passcode to Inbox
+          </button>
+        </div>
+        <p style="font-size: 12px; color: #15803d; line-height: 1.4; margin-bottom: 10px;">
+          Dispatched strictly to the primary client inbox (<strong id="client-email-target">excellencejumo@outlook.com</strong>). CC recipients (sales/manager) cannot sign without this code.
+        </p>
+        <div>
+          <input type="text" id="accept-otp-input" class="form-input" placeholder="Enter 6-digit passcode (e.g. 849201)" maxlength="6" style="letter-spacing: 0.15em; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 14px; text-transform: uppercase;" />
+        </div>
+        <div id="otp-status-msg" style="margin-top: 8px; font-size: 12px; display: none;"></div>
       </div>
 
       <div style="margin: 16px 0; padding: 12px; background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 8px; font-size: 12px; color: var(--slate-600);">
@@ -526,8 +548,57 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
+    const clientToken = params.get('token') || '';
+    let currentProposalStatus = '';
+    let isClientAuthorized = false;
+    let clientEmailAddress = 'excellencejumo@outlook.com';
+
+    function requestSigningOtp() {
+      const btn = document.getElementById('btn-request-otp');
+      const statusMsg = document.getElementById('otp-status-msg');
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      statusMsg.style.display = 'block';
+      statusMsg.style.color = '#15803d';
+      statusMsg.textContent = 'Dispatching 6-digit passcode via secure SMTP...';
+
+      fetch(`/api/proposals/${id}/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ token: clientToken })
+      })
+      .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.message || 'Failed to dispatch passcode'); });
+        return r.json();
+      })
+      .then(res => {
+        btn.textContent = 'Resend Passcode';
+        statusMsg.style.color = '#166534';
+        statusMsg.innerHTML = `✅ <strong>Passcode dispatched!</strong> Check primary client inbox: <code>${res.client_email}</code>.`;
+      })
+      .catch(err => {
+        btn.textContent = 'Retry Send';
+        statusMsg.style.color = '#b91c1c';
+        statusMsg.textContent = '❌ Error: ' + err.message;
+      })
+      .finally(() => {
+        btn.disabled = false;
+      });
+    }
 
     function openFeedbackModal() {
+      if (!isClientAuthorized) {
+        alert('This view is in Read-Only Preview. Client actions require the secure hashed link delivered to the client email.');
+        return;
+      }
+      if (currentProposalStatus !== 'delivered') {
+        alert('Client revisions are only available once the proposal has been approved and delivered.');
+        return;
+      }
       document.getElementById('feedback-modal').style.display = 'flex';
     }
 
@@ -537,7 +608,26 @@
     }
 
     function openAcceptModal() {
+      if (!isClientAuthorized) {
+        alert('This view is in Read-Only Preview. Only the client holding the cryptographically verified token from their delivery email can accept and sign.');
+        return;
+      }
+      if (currentProposalStatus !== 'delivered') {
+        alert('This proposal cannot be accepted in its current status (' + (currentProposalStatus || 'unapproved') + '). It must be formally delivered to the client first.');
+        return;
+      }
+      const targetEl = document.getElementById('client-email-target');
+      if (targetEl && clientEmailAddress) {
+        targetEl.textContent = clientEmailAddress;
+      }
       document.getElementById('accept-modal').style.display = 'flex';
+
+      // Auto-dispatch OTP challenge if not already active
+      const otpInput = document.getElementById('accept-otp-input');
+      const statusMsg = document.getElementById('otp-status-msg');
+      if (!otpInput.value && (!statusMsg || statusMsg.style.display === 'none')) {
+        requestSigningOtp();
+      }
     }
 
     function openValidityModal(data, daysRemaining, formattedDate) {
@@ -586,10 +676,20 @@
 
       fetch(`/api/proposals/${id}/request-client-revision`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_feedback: feedback, actor: 'Client (Public Portal)' })
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ 
+          client_feedback: feedback, 
+          actor: 'Client (Public Portal)',
+          token: clientToken 
+        })
       })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.message || 'Feedback submission failed'); });
+        return r.json();
+      })
       .then(res => {
         alert('Your revision request has been submitted to the Koya management team. You will receive an updated proposal once approved.');
         closeFeedbackModal();
@@ -607,6 +707,7 @@
     function submitAcceptance() {
       const name = document.getElementById('accept-name-input').value.trim();
       const title = document.getElementById('accept-title-input').value.trim();
+      const otp = document.getElementById('accept-otp-input').value.trim();
       const confirmed = document.getElementById('accept-confirm-check').checked;
 
       if (!name) {
@@ -617,6 +718,10 @@
         alert('Please enter your corporate title.');
         return;
       }
+      if (!otp) {
+        alert('Please enter your 6-digit client authorization passcode. Click "Send Passcode to Inbox" if you have not requested one yet.');
+        return;
+      }
       if (!confirmed) {
         alert('Please check the confirmation box to verify executive authorization.');
         return;
@@ -624,19 +729,27 @@
 
       const btn = document.getElementById('btn-submit-accept');
       btn.disabled = true;
-      btn.textContent = 'Recording Signature...';
+      btn.textContent = 'Verifying Passcode & Recording Signature...';
 
       fetch(`/api/proposals/${id}/accept`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signer_name: name, signer_title: title })
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ 
+          signer_name: name, 
+          signer_title: title,
+          token: clientToken,
+          otp: otp
+        })
       })
       .then(r => {
         if (!r.ok) return r.json().then(e => { throw new Error(e.message || 'Acceptance failed'); });
         return r.json();
       })
       .then(res => {
-        alert('🎉 Proposal accepted and digitally executed! An official confirmation and audit record have been generated.');
+        alert('🎉 Proposal accepted and digitally executed! One-time passcode verified and immutable SHA-256 seal generated.');
         closeAcceptModal();
         window.location.reload();
       })
@@ -652,7 +765,12 @@
     if (!id) {
       document.getElementById('loading').textContent = 'Error: No proposal ID specified in URL.';
     } else {
-      fetch(`/api/proposals/${id}/public`)
+      fetch(`/api/proposals/${id}/public?token=${encodeURIComponent(clientToken)}`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
+      })
         .then(r => {
           if (!r.ok) throw new Error('Proposal not found or unapproved');
           return r.json();
@@ -660,6 +778,10 @@
         .then(data => {
           document.getElementById('loading').style.display = 'none';
           document.getElementById('content').style.display = 'block';
+
+          clientEmailAddress = data.client_email || 'excellencejumo@outlook.com';
+          const emailTarget = document.getElementById('client-email-target');
+          if (emailTarget) emailTarget.textContent = clientEmailAddress;
 
           document.getElementById('p-title').textContent = data.title;
           document.getElementById('p-client').textContent = data.client_name;
@@ -675,11 +797,15 @@
             document.getElementById('p-valid-until').textContent = '30 Days from Issue';
           }
 
-          // Status & Digital Acceptance Handling
+          currentProposalStatus = data.status;
+          isClientAuthorized = Boolean(data.is_authorized_client);
+
+          // Status & Cryptographic Authorization Handling
           const acceptSection = document.getElementById('acceptance-section');
           const topAcceptBtn = document.getElementById('btn-top-accept');
           const topRevisionBtn = document.getElementById('btn-top-revision');
           const feedbackBanner = document.getElementById('feedback-banner-box');
+          const staffBadge = document.getElementById('staff-preview-badge');
 
           if (data.status === 'accepted' || data.acceptance) {
             topAcceptBtn.style.display = 'none';
@@ -709,11 +835,11 @@
                 </div>
               </div>
             `;
-          } else if (data.status === 'revision_requested') {
-            topAcceptBtn.disabled = true;
-            topAcceptBtn.style.opacity = '0.5';
-          } else {
-            // Active proposal awaiting client acceptance
+          } else if (isClientAuthorized && data.status === 'delivered') {
+            // Authorized client holding the verified cryptographic token!
+            topAcceptBtn.style.display = 'inline-flex';
+            topRevisionBtn.style.display = 'inline-flex';
+
             acceptSection.innerHTML = `
               <div class="acceptance-cta-box">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -725,6 +851,58 @@
                   </div>
                   <button class="btn btn-emerald" onclick="openAcceptModal()">✍️ Accept & Sign Proposal</button>
                 </div>
+              </div>
+            `;
+          } else if (data.status === 'revision_requested') {
+            topAcceptBtn.style.display = 'none';
+            topRevisionBtn.style.display = 'none';
+
+            acceptSection.innerHTML = `
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 24px; color: #1e40af; margin-top: 24px;">
+                <strong style="font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                  <span>💬</span> Revisions Under Review
+                </strong>
+                <p style="font-size: 12.5px; margin-top: 4px; color: #1d4ed8; line-height: 1.5;">
+                  Your requested revisions have been submitted. Our solutions engineering team is currently updating this proposal. You will receive an updated agreement link once re-approved.
+                </p>
+              </div>
+            `;
+          } else if (data.status === 'delivered') {
+            // Delivered proposal, but viewer is internal staff or lacks the client access token
+            topAcceptBtn.style.display = 'none';
+            topRevisionBtn.style.display = 'none';
+            if (staffBadge) staffBadge.style.display = 'inline-block';
+
+            acceptSection.innerHTML = `
+              <div style="background: #f8fafc; border: 1px solid var(--slate-200); border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <span style="font-size: 16px;">👔</span>
+                    <strong style="color: var(--slate-900); font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.04em;">Internal Staff Preview (Read-Only)</strong>
+                    <span style="background: #e2e8f0; color: #334155; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase;">${data.status}</span>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--slate-600); margin: 0; line-height: 1.5;">
+                    You are viewing this proposal document in preview mode. Client digital execution (Accept & Sign / Request Revisions) is cryptographically locked and active only for the customer via the hashed token link delivered to their email.
+                  </p>
+                </div>
+                <div style="text-align: right; flex-shrink: 0;">
+                  <span style="font-size: 11.5px; color: var(--slate-500); font-family: 'JetBrains Mono', monospace;">Cryptographic Gate</span>
+                </div>
+              </div>
+            `;
+          } else {
+            // Draft, pending_approval, approved before delivery, etc.
+            topAcceptBtn.style.display = 'none';
+            topRevisionBtn.style.display = 'none';
+
+            acceptSection.innerHTML = `
+              <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 18px 24px; color: #92400e; margin-top: 24px;">
+                <strong style="font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                  <span>⏳</span> Proposal Under Internal Preparation
+                </strong>
+                <p style="font-size: 12.5px; margin-top: 4px; color: #b45309; line-height: 1.5;">
+                  This document is currently undergoing internal commercial review and has not yet been formally issued for client signature. Digital execution will become available once delivered.
+                </p>
               </div>
             `;
           }
