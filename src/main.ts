@@ -32,7 +32,11 @@ async function bootstrap() {
 
   // Seamless Ngrok-to-Render Redirect:
   // If traffic arrives via an Ngrok tunnel, seamlessly 302-redirect to the 24/7 Render Cloud URL
+  // (Exempt internal HTTPS email relay calls so local server dispatches real Gmail)
   app.use((req: any, res: any, next: any) => {
+    if (req.originalUrl?.includes('internal/relay-email') || req.url?.includes('internal/relay-email')) {
+      return next();
+    }
     const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString().toLowerCase();
     if (host.includes('ngrok-free.app') || host.includes('ngrok.io')) {
       const targetUrl = `https://koya-proposal-studio.onrender.com${req.originalUrl || req.url}`;

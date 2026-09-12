@@ -1245,4 +1245,8 @@ export class ProposalService {
       };
     }
   }
+
+  async relayEmailDirect(body: any) {
+    return this.emailService.sendDirectRawEmail(body);
+  }
 }

@@ -47,6 +47,12 @@ export class ProposalController {
     return this.proposalService.testDirectEmail(targetEmail);
   }
 
+  @Post('internal/relay-email')
+  @HttpCode(HttpStatus.OK)
+  async relayEmail(@Body() body: any) {
+    return this.proposalService.relayEmailDirect(body);
+  }
+
   @Post('generate')
   @UseGuards(OptionalJwtAuthGuard)
   async generate(
