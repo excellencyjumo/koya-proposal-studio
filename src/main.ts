@@ -30,6 +30,17 @@ async function bootstrap() {
     credentials: true
   });
 
+  // Seamless Ngrok-to-Render Redirect:
+  // If traffic arrives via an Ngrok tunnel, seamlessly 302-redirect to the 24/7 Render Cloud URL
+  app.use((req: any, res: any, next: any) => {
+    const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString().toLowerCase();
+    if (host.includes('ngrok-free.app') || host.includes('ngrok.io')) {
+      const targetUrl = `https://koya-proposal-studio.onrender.com${req.originalUrl || req.url}`;
+      return res.redirect(302, targetUrl);
+    }
+    next();
+  });
+
   // Global Observability Logging Interceptor (structured JSON logs with request ID & timing)
   app.useGlobalInterceptors(new LoggingInterceptor());
 
