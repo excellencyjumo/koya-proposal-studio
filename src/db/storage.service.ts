@@ -61,8 +61,10 @@ export interface Proposal {
     email_body?: string;
     delivery_status?: string;
     error_details?: string;
+    signing_otp?: { code: string; expires_at: string; generated_at: string };
   };
   revision_request_notes?: string;
+  signing_otp?: { code: string; expires_at: string; generated_at: string };
   acceptance?: {
     accepted_by_name: string;
     accepted_by_title?: string;
@@ -170,6 +172,9 @@ export class StorageService {
       if (!p.client_access_token) {
         p.client_access_token = this.getClientAccessToken(p);
       }
+      if (p.delivery?.signing_otp && !p.signing_otp) {
+        p.signing_otp = p.delivery.signing_otp;
+      }
       existingMap.set(p.id, p);
     }
     this.cache.proposals = Array.from(existingMap.values()).sort(
@@ -182,6 +187,9 @@ export class StorageService {
     if (!proposal || !proposal.id) return;
     if (!proposal.client_access_token) {
       proposal.client_access_token = this.getClientAccessToken(proposal);
+    }
+    if (proposal.delivery?.signing_otp && !proposal.signing_otp) {
+      proposal.signing_otp = proposal.delivery.signing_otp;
     }
     const idx = this.cache.proposals.findIndex(p => p.id === proposal.id);
     if (idx >= 0) {

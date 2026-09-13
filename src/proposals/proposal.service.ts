@@ -1081,7 +1081,15 @@ export class ProposalService implements OnModuleInit {
           code: otpCode,
           expires_at: expiresAt,
           generated_at: new Date().toISOString()
-        }
+        },
+        delivery: {
+          ...(proposal.delivery || { is_delivered: true }),
+          signing_otp: {
+            code: otpCode,
+            expires_at: expiresAt,
+            generated_at: new Date().toISOString()
+          }
+        } as any
       } as any,
       'System (Client Portal OTP)'
     );
@@ -1103,6 +1111,9 @@ export class ProposalService implements OnModuleInit {
       security_protocol: 'exclusive_primary_recipient_no_cc'
     });
     this.supabase.syncAuditLog(auditLog);
+    if (updatedProposal) {
+      await this.supabase.syncProposal(updatedProposal);
+    }
 
     // Live dispatch email strictly to client email (no CC)
     const emailResult = await this.emailService.sendSigningOtpEmail({
@@ -1150,7 +1161,7 @@ export class ProposalService implements OnModuleInit {
     }
 
     // Validate OTP challenge - Strictly mandatory for client digital execution
-    const signingOtp = (proposal as any).signing_otp;
+    const signingOtp = (proposal as any).signing_otp || (proposal.delivery as any)?.signing_otp;
     if (!signingOtp || !signingOtp.code) {
       throw new BadRequestException('A 6-digit client authorization passcode (OTP) is required. Please click "Send Passcode to Inbox" to generate and verify your code.');
     }
