@@ -5,14 +5,14 @@ export class SlackService {
   private readonly logger = new Logger(SlackService.name);
 
   private getBaseUrl(options: { host?: string; protocol?: string } = {}): string {
+    const envUrl = process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL;
+    if (envUrl && envUrl.trim().startsWith('http')) {
+      return envUrl.trim().replace(/\/+$/, '');
+    }
     if (options.host && !options.host.includes('localhost')) {
       return `${options.protocol || 'https'}://${options.host}`;
     }
-    const envUrl = process.env.PUBLIC_APP_URL;
-    if (envUrl && envUrl.startsWith('http')) {
-      return envUrl.replace(/\/+$/, '');
-    }
-    return 'https://3f57-102-88-167-104.ngrok-free.app';
+    return 'https://koya-proposal-studio.onrender.com';
   }
 
   buildSlackPayload(proposal: any, options: { host?: string; protocol?: string; actor?: string } = {}) {

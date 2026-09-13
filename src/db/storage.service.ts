@@ -163,6 +163,51 @@ export class StorageService {
     return this.cache.proposals;
   }
 
+  hydrateProposals(proposals: Proposal[]): void {
+    if (!Array.isArray(proposals)) return;
+    const existingMap = new Map(this.cache.proposals.map(p => [p.id, p]));
+    for (const p of proposals) {
+      if (!p.client_access_token) {
+        p.client_access_token = this.getClientAccessToken(p);
+      }
+      existingMap.set(p.id, p);
+    }
+    this.cache.proposals = Array.from(existingMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    this.queueSave();
+  }
+
+  hydrateProposal(proposal: Proposal): void {
+    if (!proposal || !proposal.id) return;
+    if (!proposal.client_access_token) {
+      proposal.client_access_token = this.getClientAccessToken(proposal);
+    }
+    const idx = this.cache.proposals.findIndex(p => p.id === proposal.id);
+    if (idx >= 0) {
+      this.cache.proposals[idx] = proposal;
+    } else {
+      this.cache.proposals.unshift(proposal);
+    }
+    this.queueSave();
+  }
+
+  hydrateAuditLogs(proposalId: string, logs: AuditLog[]): void {
+    if (!Array.isArray(logs)) return;
+    const otherLogs = this.cache.audit_logs.filter(l => l.proposal_id !== proposalId);
+    const existingIds = new Set(otherLogs.map(l => l.id));
+    for (const log of logs) {
+      if (!existingIds.has(log.id)) {
+        otherLogs.push(log);
+        existingIds.add(log.id);
+      }
+    }
+    this.cache.audit_logs = otherLogs.sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    this.queueSave();
+  }
+
   getProposalById(id: string): Proposal | undefined {
     return this.cache.proposals.find((p) => p.id === id);
   }

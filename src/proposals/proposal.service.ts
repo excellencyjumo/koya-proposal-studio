@@ -5,7 +5,8 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
-  Logger
+  Logger,
+  OnModuleInit
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { StorageService, Proposal } from '../db/storage.service';
@@ -16,7 +17,7 @@ import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
-export class ProposalService {
+export class ProposalService implements OnModuleInit {
   private readonly logger = new Logger(ProposalService.name);
 
   constructor(
@@ -27,6 +28,32 @@ export class ProposalService {
     private readonly redis: RedisService,
     private readonly emailService: EmailService
   ) {}
+
+  async onModuleInit() {
+    this.logger.log('[ProposalService] Hydrating proposals from Supabase PostgreSQL on startup...');
+    try {
+      const cloudProposals = await this.supabase.fetchAllProposals();
+      if (cloudProposals && cloudProposals.length > 0) {
+        this.storage.hydrateProposals(cloudProposals);
+        this.logger.log(`[ProposalService] Successfully hydrated ${cloudProposals.length} proposals from Supabase on startup.`);
+      } else {
+        this.logger.log('[ProposalService] Supabase proposals table initialized and ready.');
+      }
+    } catch (err: any) {
+      this.logger.warn(`[ProposalService] Startup Supabase hydration notice: ${err.message}`);
+    }
+  }
+
+  getAppBaseUrl(reqInfo?: { host?: string; protocol?: string }): string {
+    const envUrl = process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL;
+    if (envUrl && envUrl.trim().startsWith('http')) {
+      return envUrl.trim().replace(/\/+$/, '');
+    }
+    if (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost')) {
+      return `${reqInfo.protocol || 'https'}://${reqInfo.host}`;
+    }
+    return 'https://koya-proposal-studio.onrender.com';
+  }
 
   private async invalidateCache(id?: string) {
     try {
@@ -124,8 +151,8 @@ export class ProposalService {
 
     this.validatePricingConsistency(proposal, intakeData);
 
-    // Cloud sync
-    this.supabase.syncProposal(proposal);
+    // Cloud sync to Supabase public.proposals
+    await this.supabase.syncProposal(proposal);
     this.invalidateCache(proposal.id);
 
     return {
@@ -214,6 +241,15 @@ export class ProposalService {
   }
 
   async getProposals(): Promise<Proposal[]> {
+    try {
+      const cloudProposals = await this.supabase.fetchAllProposals();
+      if (cloudProposals && cloudProposals.length > 0) {
+        this.storage.hydrateProposals(cloudProposals);
+        return cloudProposals;
+      }
+    } catch (err: any) {
+      this.logger.warn(`Supabase getProposals notice: ${err.message}`);
+    }
     const cached = await this.redis.get<Proposal[]>('cache:proposals:all');
     if (cached) return cached;
     const proposals = this.storage.getProposals();
@@ -222,15 +258,37 @@ export class ProposalService {
   }
 
   async getProposalById(id: string) {
-    const cached = await this.redis.get<Proposal>(`cache:proposal:${id}`);
-    const proposal = cached || this.storage.getProposalById(id);
+    let proposal: Proposal | undefined;
+    try {
+      const cloud = await this.supabase.fetchProposalById(id);
+      if (cloud) {
+        this.storage.hydrateProposal(cloud);
+        proposal = cloud;
+      }
+    } catch (err: any) {
+      this.logger.warn(`Supabase fetchProposalById(${id}) notice: ${err.message}`);
+    }
+
+    if (!proposal) {
+      const cached = await this.redis.get<Proposal>(`cache:proposal:${id}`);
+      proposal = cached || this.storage.getProposalById(id);
+    }
+
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
     }
-    if (!cached) {
-      await this.redis.set(`cache:proposal:${id}`, proposal, 3600);
+
+    let auditLogs = this.storage.getAuditLogs(id);
+    try {
+      const cloudLogs = await this.supabase.fetchAuditLogs(id);
+      if (cloudLogs && cloudLogs.length > 0) {
+        this.storage.hydrateAuditLogs(id, cloudLogs);
+        auditLogs = cloudLogs;
+      }
+    } catch {
+      // fallback to local logs
     }
-    const auditLogs = this.storage.getAuditLogs(id);
+
     return {
       success: true,
       proposal,
@@ -239,7 +297,7 @@ export class ProposalService {
   }
 
 
-  updateSection(
+  async updateSection(
     id: string,
     sectionKey: string,
     content: string,
@@ -273,7 +331,7 @@ export class ProposalService {
       throw new NotFoundException(`Proposal ${id} not found`);
     }
 
-    this.supabase.syncProposal(updated);
+    await this.supabase.syncProposal(updated);
     this.invalidateCache(id);
     return { success: true, proposal: updated };
   }
@@ -326,8 +384,8 @@ export class ProposalService {
         estimated_cost_usd: regenResult.telemetry?.estimated_cost_usd || 0
       });
 
-      this.supabase.syncProposal(updated);
-      this.supabase.syncAuditLog(log);
+      await this.supabase.syncProposal(updated);
+      await this.supabase.syncAuditLog(log);
       this.invalidateCache(id);
 
       return {
@@ -416,9 +474,9 @@ export class ProposalService {
       });
     }
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(submitLog);
-    if (slackLog) this.supabase.syncAuditLog(slackLog);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(submitLog);
+    if (slackLog) await this.supabase.syncAuditLog(slackLog);
     this.invalidateCache(id);
 
     return {
@@ -455,7 +513,7 @@ export class ProposalService {
       }
     );
 
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncAuditLog(log);
 
     return {
       success: true,
@@ -557,8 +615,8 @@ export class ProposalService {
       feedback: feedbackNotes || 'All commercial terms and milestones validated.'
     });
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     // Push Notification: Manager Approval to Slack
@@ -567,9 +625,7 @@ export class ProposalService {
     // Automated Email Dispatch to Sales Rep with CC to Approving Manager & Admin
     const salesEmail = (updated.salesperson_name === 'Sarah Chen' ? 'sarah.chen@koyatalent.com' : 'sarah.chen@koyatalent.com');
     const managerEmail = approver?.email || (approverName === 'Marcus Vance' ? 'marcus.vance@koyatalent.com' : 'elena.rostova@koyatalent.com');
-    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
-      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
-      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const publicBase = this.getAppBaseUrl(reqInfo);
     const clientLink = `${publicBase}/client-view.html?id=${updated.id}`;
 
     const approvalEmailResult = await this.emailService.sendApprovalEmail({
@@ -588,7 +644,7 @@ export class ProposalService {
       cc: [managerEmail, 'excellencejumo@gmail.com'],
       result: approvalEmailResult
     });
-    this.supabase.syncAuditLog(emailLog);
+    await this.supabase.syncAuditLog(emailLog);
 
     return {
       success: true,
@@ -599,7 +655,7 @@ export class ProposalService {
     };
   }
 
-  requestChanges(id: string, reviewer: any, feedbackNotes?: string) {
+  async requestChanges(id: string, reviewer: any, feedbackNotes?: string) {
     const proposal = this.storage.getProposalById(id);
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
@@ -624,15 +680,14 @@ export class ProposalService {
       feedback: feedbackNotes || 'Please adjust pricing or timeline.'
     });
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     // Push Notification: Changes Requested
     this.slack.dispatchChangesRequestedNotification(updated, reviewerName, feedbackNotes);
 
     return { success: true, proposal: updated };
-
   }
 
   async deliverProposal(
@@ -674,9 +729,7 @@ export class ProposalService {
       });
     }
 
-    const publicBase = (reqInfo.host && !reqInfo.host.includes('localhost'))
-      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
-      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const publicBase = this.getAppBaseUrl(reqInfo);
     const clientToken = this.storage.getClientAccessToken(proposal);
     const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const formattedEmail = this.claude.formatClientEmail(proposal, clientLink);
@@ -740,8 +793,8 @@ export class ProposalService {
       }
     );
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     if (isEmailSuccess) {
@@ -789,9 +842,7 @@ export class ProposalService {
     if (!proposal) {
       throw new NotFoundException(`Proposal ${id} not found`);
     }
-    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
-      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
-      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const publicBase = this.getAppBaseUrl(reqInfo);
     const clientToken = this.storage.getClientAccessToken(proposal);
     const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const result = await this.emailService.sendProposalEmail({
@@ -806,7 +857,7 @@ export class ProposalService {
       cc: options.cc,
       result
     });
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncAuditLog(log);
     return result;
   }
 
@@ -843,8 +894,8 @@ export class ProposalService {
       requested_at: new Date().toISOString()
     });
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     // Slack alert for management
@@ -897,8 +948,8 @@ export class ProposalService {
       unlocked_at: new Date().toISOString()
     });
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     // Slack notification: Revisions unlocked
@@ -922,9 +973,7 @@ export class ProposalService {
       throw new NotFoundException('Proposal not found');
     }
 
-    const publicBase = (reqInfo && reqInfo.host && !reqInfo.host.includes('localhost'))
-      ? `${reqInfo.protocol || 'https'}://${reqInfo.host}`
-      : (process.env.PUBLIC_APP_URL || 'https://3f57-102-88-167-104.ngrok-free.app');
+    const publicBase = this.getAppBaseUrl(reqInfo);
     const clientToken = this.storage.getClientAccessToken(proposal);
     const clientLink = `${publicBase}/client-view.html?id=${proposal.id}&token=${clientToken}`;
     const emailData = this.claude.formatClientEmail(proposal, clientLink);
@@ -1150,8 +1199,8 @@ export class ProposalService {
       otp_verified: Boolean(signingOtp?.code)
     });
 
-    this.supabase.syncProposal(updated);
-    this.supabase.syncAuditLog(log);
+    await this.supabase.syncProposal(updated);
+    await this.supabase.syncAuditLog(log);
     this.invalidateCache(id);
 
     // Slack alert for deal won

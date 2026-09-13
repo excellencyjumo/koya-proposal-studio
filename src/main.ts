@@ -39,7 +39,8 @@ async function bootstrap() {
     }
     const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString().toLowerCase();
     if (host.includes('ngrok-free.app') || host.includes('ngrok.io')) {
-      const targetUrl = `https://koya-proposal-studio.onrender.com${req.originalUrl || req.url}`;
+      const publicBaseUrl = (process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || 'https://koya-proposal-studio.onrender.com').replace(/\/+$/, '');
+      const targetUrl = `${publicBaseUrl}${req.originalUrl || req.url}`;
       return res.redirect(302, targetUrl);
     }
     next();

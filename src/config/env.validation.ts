@@ -4,6 +4,7 @@ export interface EnvironmentConfig {
   JWT_SECRET: string;
   ANTHROPIC_API_KEY: string;
   CLAUDE_MODEL: string;
+  APP_BASE_URL: string;
   STORAGE_DRIVER: 'supabase' | 'local';
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -59,6 +60,7 @@ export function validateEnvironment(): EnvironmentConfig {
     JWT_SECRET: JWT_SECRET!,
     ANTHROPIC_API_KEY: ANTHROPIC_API_KEY!,
     CLAUDE_MODEL: process.env.CLAUDE_MODEL?.trim() || 'claude-haiku-4-5-20251001',
+    APP_BASE_URL: (process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || 'https://koya-proposal-studio.onrender.com').trim().replace(/\/+$/, ''),
     STORAGE_DRIVER: storageDriver,
     SUPABASE_URL: process.env.SUPABASE_URL?.trim(),
     SUPABASE_SERVICE_ROLE_KEY: (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY)?.trim(),

@@ -56,6 +56,14 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
     }
   }
 
+  private getAppBaseUrl(): string {
+    const envUrl = process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL;
+    if (envUrl && envUrl.trim().startsWith('http')) {
+      return envUrl.trim().replace(/\/+$/, '');
+    }
+    return 'https://koya-proposal-studio.onrender.com';
+  }
+
   async checkAndSendReminders(options: { force?: boolean } = {}) {
     const proposals = this.storage.getProposals();
     const now = Date.now();
@@ -73,26 +81,22 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
 
         if (now - lastSent >= cooldown) {
           const submittedAt = new Date(proposal.updated_at || proposal.created_at || now).getTime();
-          const hoursPending = Math.max(1, Math.round((now - submittedAt) / (60 * 60 * 1000)));
+          const hoursPending = Math.round((now - submittedAt) / (1000 * 60 * 60));
 
           const payload = {
-            text: `⏰ SLA Reminder: Proposal Pending Manager Review — ${proposal.company_name}`,
+            text: `Review Reminder: Proposal for ${proposal.company_name} has been pending approval for ${hoursPending}h.`,
             blocks: [
               {
                 type: 'header',
-                text: {
-                  type: 'plain_text',
-                  text: '⏰ Review SLA Reminder: Manager Sign-off Pending',
-                  emoji: true
-                }
+                text: { type: 'plain_text', text: '⏰ Manager Review Deadline Reminder', emoji: true }
               },
               {
                 type: 'section',
                 fields: [
                   { type: 'mrkdwn', text: `*Company:*\n${proposal.company_name}` },
-                  { type: 'mrkdwn', text: `*Contact:*\n${proposal.client_name}` },
-                  { type: 'mrkdwn', text: `*Salesperson:*\n${proposal.salesperson_name}` },
-                  { type: 'mrkdwn', text: `*Awaiting Review:*\n~${hoursPending}h pending` }
+                  { type: 'mrkdwn', text: `*Client:*\n${proposal.client_name}` },
+                  { type: 'mrkdwn', text: `*Submitted By:*\n${proposal.salesperson_name}` },
+                  { type: 'mrkdwn', text: `*Time Pending:*\n${hoursPending} hours` }
                 ]
               },
               {
@@ -109,7 +113,7 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
                     type: 'button',
                     text: { type: 'plain_text', text: 'Review & Sign Off', emoji: true },
                     style: 'primary',
-                    url: `http://localhost:3000/proposals/${proposal.id}`
+                    url: `${this.getAppBaseUrl()}/proposals/${proposal.id}`
                   }
                 ]
               }
@@ -125,7 +129,7 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
             'System Scheduler',
             { hours_pending: hoursPending, dispatched: dispatchResult.dispatched }
           );
-          this.supabase.syncAuditLog(log);
+          await this.supabase.syncAuditLog(log);
 
           results.push({ id, type: 'review_reminder', dispatched: Boolean(dispatchResult.dispatched) });
         }
@@ -242,7 +246,7 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
                     type: 'button',
                     text: { type: 'plain_text', text: 'Open Proposal Studio', emoji: true },
                     style: 'primary',
-                    url: `http://localhost:3000/proposals/${proposal.id}`
+                    url: `${this.getAppBaseUrl()}/proposals/${proposal.id}`
                   }
                 ]
               }
@@ -258,7 +262,7 @@ export class ProposalReminderService implements OnApplicationBootstrap, OnApplic
             'System Scheduler',
             { hours_approved: hoursApproved, dispatched: dispatchResult.dispatched }
           );
-          this.supabase.syncAuditLog(log);
+          await this.supabase.syncAuditLog(log);
 
           results.push({ id, type: 'delivery_reminder', dispatched: Boolean(dispatchResult.dispatched) });
         }

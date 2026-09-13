@@ -62,6 +62,58 @@ export class SupabaseService {
     }
   }
 
+  async fetchAllProposals(): Promise<any[]> {
+    if (!this.isConfigured()) return [];
+    try {
+      const res = await fetch(`${this.url}/rest/v1/proposals?select=*&order=created_at.desc`, {
+        headers: this.getHeaders('return=representation')
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        this.logger.warn(`Supabase fetchAllProposals notice: HTTP ${res.status} - ${errText}`);
+        return [];
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (err: any) {
+      this.logger.error(`Supabase fetchAllProposals exception: ${err.message}`);
+      return [];
+    }
+  }
+
+  async fetchProposalById(id: string): Promise<any | null> {
+    if (!this.isConfigured() || !id) return null;
+    try {
+      const res = await fetch(`${this.url}/rest/v1/proposals?id=eq.${encodeURIComponent(id)}&select=*`, {
+        headers: this.getHeaders('return=representation')
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    } catch (err: any) {
+      this.logger.error(`Supabase fetchProposalById exception: ${err.message}`);
+      return null;
+    }
+  }
+
+  async fetchAuditLogs(proposalId: string): Promise<any[]> {
+    if (!this.isConfigured() || !proposalId) return [];
+    try {
+      const res = await fetch(
+        `${this.url}/rest/v1/proposal_audit_logs?proposal_id=eq.${encodeURIComponent(proposalId)}&select=*&order=timestamp.asc`,
+        {
+          headers: this.getHeaders('return=representation')
+        }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (err: any) {
+      this.logger.error(`Supabase fetchAuditLogs exception: ${err.message}`);
+      return [];
+    }
+  }
+
   async syncProposal(proposal: any): Promise<boolean> {
     if (!this.isConfigured()) return false;
 
@@ -76,17 +128,21 @@ export class SupabaseService {
         client_email: proposal.client_email,
         company_name: proposal.company_name,
         salesperson_name: proposal.salesperson_name,
-        date_of_call: proposal.date_of_call,
-        content_digest: proposal.content_digest,
-        intake_data: proposal.intake_data,
-        supporting_material: proposal.supporting_material,
-        has_gaps: proposal.has_gaps,
-        gaps: proposal.gaps,
-        sections: proposal.sections,
-        version_history: proposal.version_history,
-        telemetry: proposal.telemetry,
-        approval: proposal.approval,
-        delivery: proposal.delivery,
+        created_by_user_id: proposal.created_by_user_id || null,
+        date_of_call: proposal.date_of_call || null,
+        valid_until: proposal.valid_until || null,
+        content_digest: proposal.content_digest || null,
+        intake_data: proposal.intake_data || {},
+        supporting_material: proposal.supporting_material || '',
+        has_gaps: Boolean(proposal.has_gaps),
+        gaps: proposal.gaps || [],
+        sections: proposal.sections || {},
+        version_history: proposal.version_history || [],
+        telemetry: proposal.telemetry || {},
+        approval: proposal.approval || null,
+        delivery: proposal.delivery || null,
+        revision_request_notes: proposal.revision_request_notes || null,
+        acceptance: proposal.acceptance || null,
         created_at: proposal.created_at,
         updated_at: proposal.updated_at
       };
@@ -94,13 +150,14 @@ export class SupabaseService {
       // 1. Primary sync attempt to proposals table
       const res = await fetch(`${this.url}/rest/v1/proposals`, {
         method: 'POST',
-        headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
+        headers: this.getHeaders('resolution=merge-duplicates,return=representation'),
         body: JSON.stringify(payload)
       });
 
       let proposalsTableSynced = false;
       if (res.ok) {
         proposalsTableSynced = true;
+        this.logger.log(`[Supabase] Proposal ${proposal.id} successfully saved to public.proposals`);
       } else {
         const errorText = await res.text();
         this.logger.warn(`Supabase public.proposals sync notice: HTTP ${res.status} - ${errorText}`);
@@ -164,7 +221,7 @@ export class SupabaseService {
 
       this.syncMetrics.synced_proposals++;
       this.syncMetrics.last_synced_at = new Date().toISOString();
-      return true;
+      return proposalsTableSynced;
     } catch (err: any) {
       this.logger.error(`Supabase sync exception: ${err.message}`);
       this.syncMetrics.failed_syncs++;
@@ -188,7 +245,7 @@ export class SupabaseService {
       // 1. Primary sync attempt to proposal_audit_logs table
       const res = await fetch(`${this.url}/rest/v1/proposal_audit_logs`, {
         method: 'POST',
-        headers: this.getHeaders('return=minimal'),
+        headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
         body: JSON.stringify(payload)
       });
 

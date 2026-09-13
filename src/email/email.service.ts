@@ -534,7 +534,8 @@ Security Notice: This passcode is sent exclusively to the primary client recipie
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
 
-    const clientLink = `http://localhost:3000/client-view.html?id=${dummyProposal.id}`;
+    const baseUrl = (process.env.APP_BASE_URL || process.env.PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || 'https://koya-proposal-studio.onrender.com').replace(/\/+$/, '');
+    const clientLink = `${baseUrl}/client-view.html?id=${dummyProposal.id}`;
     return this.sendProposalEmail({
       to: toEmail,
       proposal: dummyProposal,
