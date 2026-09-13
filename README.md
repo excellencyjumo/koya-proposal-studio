@@ -8,8 +8,7 @@ Enterprise AI-powered proposal studio built on **TypeScript 5.x** and **NestJS 1
 
 - **Production Cloud Application:** [https://koya-proposal-studio.onrender.com](https://koya-proposal-studio.onrender.com)
 - **Terminus Observability Health Check:** [https://koya-proposal-studio.onrender.com/healthz](https://koya-proposal-studio.onrender.com/healthz)
-- **Client Digital Execution Portal:** [Customer Signing Portal](https://koya-proposal-studio.onrender.com/client-view.html?id=prop_1789163717169_s2p3h&token=37c66a402aed402bb12a814e601ff39f)
-- **Alternative Development Tunnel:** [https://3f57-102-88-167-104.ngrok-free.app](https://3f57-102-88-167-104.ngrok-free.app)
+- **Client Digital Execution Portal:** `https://koya-proposal-studio.onrender.com/client-view.html?id=<PROPOSAL_ID>&token=<EXECUTION_TOKEN>`
 
 ---
 
@@ -26,11 +25,6 @@ npm run build
 npm start
 # Server runs on http://localhost:3000
 # Observability Health check on http://localhost:3000/healthz
-```
-
-### 3. Run 13-Scenario Verification Test Suite
-```bash
-npm run test:scenarios
 ```
 
 ---

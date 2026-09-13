@@ -7,8 +7,7 @@
     "build:server": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
     "build:client": "npm --prefix client run build",
     "start": "node dist/main.js",
-    "start:dev": "ts-node src/main.ts",
-    "test:scenarios": "node test_scenarios.js"
+    "start:dev": "ts-node src/main.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
