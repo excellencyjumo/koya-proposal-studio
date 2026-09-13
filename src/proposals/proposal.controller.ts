@@ -290,7 +290,7 @@ export class ProposalController {
     const signerName = body?.signer_name || body?.name || body?.signerName;
     const signerTitle = body?.signer_title || body?.title || body?.signerTitle;
     const token = body?.token;
-    const otp = body?.otp || body?.code;
+    const otp = body?.otp || body?.code || body?.passcode;
     return this.proposalService.acceptProposal(id, signerName, signerTitle, token, otp);
   }
 
