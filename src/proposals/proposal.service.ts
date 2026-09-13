@@ -479,8 +479,22 @@ export class ProposalService implements OnModuleInit {
     if (slackLog) await this.supabase.syncAuditLog(slackLog);
     this.invalidateCache(id);
 
-    return {
+    // Automated Manager Review Email Invite to Excellence Jumo / Managers
+    try {
+      const studioBase = this.getAppBaseUrl(reqInfo);
+      const studioUrl = `${studioBase}/?proposalId=${updated.id}`;
+      await this.emailService.sendManagerReviewInviteEmail({
+        proposal: updated,
+        managerEmail: 'excellencejumo@gmail.com',
+        managerName: 'Excellence Jumo',
+        salesName: actor,
+        studioUrl
+      });
+    } catch (err: any) {
+      this.logger.warn(`Manager review invite email failed: ${err.message}`);
+    }
 
+    return {
       success: true,
       proposal: updated,
       slack_dispatch: slackResult

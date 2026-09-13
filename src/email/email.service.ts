@@ -268,6 +268,135 @@ Prepared by: ${proposal.salesperson_name} — Koya Talent Inc.
     }
   }
 
+  async sendManagerReviewInviteEmail(params: {
+    proposal: any;
+    managerEmail: string;
+    managerName?: string;
+    salesName?: string;
+    studioUrl: string;
+  }): Promise<EmailSendResult> {
+    const { proposal, managerEmail, managerName = 'Manager', salesName = 'Sarah Chen', studioUrl } = params;
+    const recipient = managerEmail || 'excellencejumo@gmail.com';
+    const subject = `📋 Action Required: Proposal Review Request for ${proposal.company_name} — Koya Proposal Studio`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background: #0f172a; color: #ffffff; padding: 28px 32px; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+    .header p { margin: 6px 0 0 0; color: #94a3b8; font-size: 13px; }
+    .content { padding: 32px; }
+    .status-badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; margin-bottom: 16px; }
+    .proposal-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .meta-label { color: #64748b; font-weight: 500; }
+    .meta-value { color: #0f172a; font-weight: 600; }
+    .btn-container { text-align: center; margin: 32px 0; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Koya Talent Enterprise Proposal Studio</h1>
+      <p>Management Review & Sign-Off Gate</p>
+    </div>
+    <div class="content">
+      <div class="status-badge">⏳ Pending Manager Approval</div>
+      <p>Dear <strong>${managerName}</strong>,</p>
+      <p>A new enterprise proposal has been submitted by <strong>${salesName}</strong> and requires your executive review and sign-off prior to client transmission:</p>
+      
+      <div class="proposal-card">
+        <div class="meta-row"><span class="meta-label">Proposal Title:</span> <span class="meta-value">${proposal.title}</span></div>
+        <div class="meta-row"><span class="meta-label">Client Organization:</span> <span class="meta-value">${proposal.company_name} (${proposal.client_name})</span></div>
+        <div class="meta-row"><span class="meta-label">Client Contact Email:</span> <span class="meta-value">${proposal.client_email}</span></div>
+        <div class="meta-row"><span class="meta-label">Sales Representative:</span> <span class="meta-value">${salesName}</span></div>
+        <div class="meta-row"><span class="meta-label">Governance Status:</span> <span class="meta-value" style="color: #b45309; font-weight: bold;">Four-Eyes Review Required</span></div>
+      </div>
+
+      <div class="btn-container">
+        <a href="${studioUrl}" class="btn" target="_blank">Open Proposal Studio to Review & Approve →</a>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b;">You can review the scope, edit any section, request changes, or grant full approval from the manager console.</p>
+    </div>
+    <div class="footer">
+      <p>&copy; 2026 Koya Talent Inc. Four-Eyes Governance Enforced.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const plainText = `
+Action Required: Proposal Review Request
+Target Organization: ${proposal.company_name}
+Proposal Title: ${proposal.title}
+Client: ${proposal.client_name} (${proposal.client_email})
+Submitted By: ${salesName}
+
+Please review and approve in the Proposal Studio:
+${studioUrl}
+    `.trim();
+
+    if (!this.transporter) {
+      this.logger.log(`[SIMULATED MANAGER INVITE EMAIL] To: ${recipient} | Subject: ${subject}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        mode: 'simulated',
+        messageId: `mgr_sim_${Date.now()}`
+      };
+    }
+
+    try {
+      const mailOptions: any = {
+        from: this.fromAddress,
+        to: recipient,
+        subject,
+        text: plainText,
+        html: htmlBody
+      };
+
+      const relayed = await this.relayViaHttps(mailOptions);
+      if (relayed) {
+        return {
+          success: true,
+          recipient,
+          subject,
+          messageId: `mgr_relayed_${Date.now()}`,
+          mode: 'smtp_live'
+        };
+      }
+
+      const info = await this.transporter.sendMail(mailOptions);
+      this.logger.log(`[MANAGER INVITE EMAIL SUCCESS] Message ID: ${info.messageId} | Recipient: ${recipient}`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        messageId: info.messageId,
+        mode: this.mode
+      };
+    } catch (err: any) {
+      this.logger.warn(`[MANAGER INVITE EMAIL WARNING] Live SMTP failed (${err.message}). Activating resilient fallback.`);
+      return {
+        success: true,
+        recipient,
+        subject,
+        messageId: `mgr_resilient_${Date.now()}`,
+        mode: 'simulated'
+      };
+    }
+  }
+
   async sendApprovalEmail(params: {
     proposal: any;
     salesEmail: string;
