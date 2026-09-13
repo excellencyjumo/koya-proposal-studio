@@ -92,11 +92,12 @@ export class ClaudeService {
     const isEmpty = (v: any) =>
       !v ||
       String(v).trim() === '' ||
-      ['tbd', 'to be decided', 'n/a', 'unknown', 'pending', 'flexible'].includes(
+      ['tbd', 'to be decided', 'n/a', 'unknown', 'pending', 'flexible', 'tbc', 'to be confirmed'].includes(
         String(v).trim().toLowerCase()
       );
 
-    if (isEmpty(intake.estimated_pricing)) {
+    const pricing = intake.estimated_pricing || intake.pricing || intake.budget || intake.estimated_budget;
+    if (isEmpty(pricing)) {
       gaps.push({
         field: 'estimated_pricing',
         severity: 'high',
@@ -106,7 +107,8 @@ export class ClaudeService {
       });
     }
 
-    if (isEmpty(intake.proposed_timeline)) {
+    const timeline = intake.proposed_timeline || intake.timeline || intake.duration;
+    if (isEmpty(timeline)) {
       gaps.push({
         field: 'proposed_timeline',
         severity: 'medium',
@@ -116,7 +118,8 @@ export class ClaudeService {
       });
     }
 
-    if (isEmpty(intake.project_scope) && isEmpty(intake.client_needs_summary)) {
+    const scope = intake.project_scope || intake.client_needs_summary || intake.scope || intake.needs_summary;
+    if (isEmpty(scope)) {
       gaps.push({
         field: 'project_scope',
         severity: 'critical',
@@ -150,6 +153,7 @@ export class ClaudeService {
 Generate a structured, rigorous 7-section professional proposal aligned with Koya Talent's proposal template.
 Strict adherence to truthfulness: DO NOT invent fake budget figures, SLAs, or timelines.
 If pricing, budget, or timeline data is missing from the intake, insert "[TO BE CONFIRMED]" as explicit placeholders so the human reviewer can finalize them.
+CRITICAL MANDATE: If pricing, timeline, or scope ARE provided in the intake requirements, you MUST use the exact provided values (e.g. the exact fee amount and duration) and you are STRICTLY FORBIDDEN from inserting "[TO BE CONFIRMED]" or "[TBC]" in those sections.
 
 Supporting Documentation Integration:
 If supporting background documentation, discovery notes, or call transcripts are provided, you MUST actively analyze and extract their concrete details (client technical stack, existing bottlenecks, specific integration requirements, past incident data, or stated milestones) and meaningfully incorporate them into the relevant sections (especially Project Scope, Recommended Approach, Deliverables, and Timeline). Do not produce generic boilerplate when real supporting material is provided.
@@ -175,11 +179,11 @@ Sales Representative: ${intakeData.salesperson_name || 'Sarah Chen'}
 Date of Discovery Call: ${intakeData.date_of_call || new Date().toISOString().split('T')[0]}
 
 Intake Requirements:
-Needs Summary: ${intakeData.client_needs_summary || 'Not provided'}
-Project Scope: ${intakeData.project_scope || 'Not provided'}
-Target Roles / Deliverables: ${intakeData.target_roles || 'Not provided'}
-Proposed Timeline: ${intakeData.proposed_timeline || 'Not provided'}
-Commercial Pricing / Budget: ${intakeData.estimated_pricing || 'Not provided'}
+Needs Summary: ${intakeData.client_needs_summary || intakeData.needs_summary || 'Not provided'}
+Project Scope: ${intakeData.project_scope || intakeData.scope || 'Not provided'}
+Target Roles / Deliverables: ${intakeData.target_roles || (Array.isArray(intakeData.deliverables) ? intakeData.deliverables.join(', ') : intakeData.deliverables) || 'Not provided'}
+Proposed Timeline: ${intakeData.proposed_timeline || intakeData.timeline || intakeData.duration || 'Not provided'}
+Commercial Pricing / Budget: ${intakeData.estimated_pricing || intakeData.pricing || intakeData.budget || intakeData.estimated_budget || 'Not provided'}
 Known Constraints / Tech Stack: ${intakeData.constraints || 'Standard enterprise guidelines'}
 
 Supporting Background Documentation:

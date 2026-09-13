@@ -603,6 +603,32 @@ export class ProposalService implements OnModuleInit {
       });
     }
 
+    // --- ANTI-TBC / DISCOVERY GAPS GOVERNANCE GATE ---
+    // Strict Policy: A proposal CANNOT be approved if it has unresolved [TO BE CONFIRMED] placeholders or discovery gaps.
+    // Even if a manager attempts to approve, the system must enforce completion of all commercial parameters first.
+    const hasTbcInSections = Object.entries(proposal.sections || {}).some(
+      ([key, content]: [string, any]) =>
+        typeof content === 'string' &&
+        (/\[TO BE CONFIRMED/i.test(content) || /\[TBC/i.test(content))
+    );
+
+    if (proposal.has_gaps || hasTbcInSections) {
+      this.storage.addAuditLog(id, 'approval_blocked_unconfirmed_terms', approverName, {
+        reason: 'Governance Policy: Proposal contains unconfirmed commercial terms or [TO BE CONFIRMED] placeholders.',
+        has_gaps: proposal.has_gaps,
+        gaps: proposal.gaps,
+        has_tbc_placeholders: hasTbcInSections
+      });
+
+      throw new ForbiddenException({
+        success: false,
+        error: 'Unconfirmed Commercial Terms',
+        code: 'UNCONFIRMED_GAPS_BLOCK_APPROVAL',
+        message:
+          'Governance Gate Violation: Proposal cannot be approved while commercial terms, pricing, or timelines contain [TO BE CONFIRMED] placeholders or unresolved discovery gaps. All terms must be finalized and confirmed before manager sign-off.'
+      });
+    }
+
     // Tamper Guard: Verify digest
     const expectedDigest = this.storage.computeContentHash(proposal.sections);
     if (proposal.content_digest && proposal.content_digest !== expectedDigest) {

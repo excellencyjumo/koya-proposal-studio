@@ -407,6 +407,15 @@ export class StorageService {
       updated_at: now
     };
 
+    // Re-evaluate if any [TO BE CONFIRMED] or [TBC] placeholders remain across sections
+    const hasRemainingTbc = Object.values(updatedSections || {}).some(
+      (s: any) => typeof s === 'string' && (/\[TO BE CONFIRMED/i.test(s) || /\[TBC/i.test(s))
+    );
+    if (!hasRemainingTbc && updated.has_gaps) {
+      updated.has_gaps = false;
+      updated.gaps = [];
+    }
+
     this.cache.proposals[index] = updated;
     this.queueSave();
 
