@@ -33,13 +33,18 @@ export class SupabaseService {
     return Boolean(this.url && this.serviceKey);
   }
 
-  private getHeaders(prefer = 'return=minimal'): Record<string, string> {
-    return {
+  private getHeaders(prefer = 'return=minimal', schema?: string): Record<string, string> {
+    const headers: Record<string, string> = {
       apikey: this.serviceKey,
       Authorization: `Bearer ${this.serviceKey}`,
       'Content-Type': 'application/json',
       Prefer: prefer
     };
+    if (schema) {
+      headers['Accept-Profile'] = schema;
+      headers['Content-Profile'] = schema;
+    }
+    return headers;
   }
 
   async checkStatus(): Promise<{ connected: boolean; project_id?: string; error?: string }> {
@@ -64,6 +69,23 @@ export class SupabaseService {
 
   async fetchAllProposals(): Promise<any[]> {
     if (!this.isConfigured()) return [];
+    // 1. Try dedicated koya_proposal_studio schema first
+    try {
+      const koyaRes = await fetch(`${this.url}/rest/v1/proposals?select=*&order=created_at.desc`, {
+        headers: this.getHeaders('return=representation', 'koya_proposal_studio')
+      });
+      if (koyaRes.ok) {
+        const data = await koyaRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.logger.log(`[Supabase] Successfully fetched ${data.length} proposals from koya_proposal_studio schema`);
+          return data;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    // 2. Fallback to public schema
     try {
       const res = await fetch(`${this.url}/rest/v1/proposals?select=*&order=created_at.desc`, {
         headers: this.getHeaders('return=representation')
@@ -83,6 +105,20 @@ export class SupabaseService {
 
   async fetchProposalById(id: string): Promise<any | null> {
     if (!this.isConfigured() || !id) return null;
+    // 1. Try dedicated koya_proposal_studio schema first
+    try {
+      const koyaRes = await fetch(`${this.url}/rest/v1/proposals?id=eq.${encodeURIComponent(id)}&select=*`, {
+        headers: this.getHeaders('return=representation', 'koya_proposal_studio')
+      });
+      if (koyaRes.ok) {
+        const data = await koyaRes.json();
+        if (Array.isArray(data) && data.length > 0) return data[0];
+      }
+    } catch {
+      // Fallback
+    }
+
+    // 2. Fallback to public schema
     try {
       const res = await fetch(`${this.url}/rest/v1/proposals?id=eq.${encodeURIComponent(id)}&select=*`, {
         headers: this.getHeaders('return=representation')
@@ -98,6 +134,23 @@ export class SupabaseService {
 
   async fetchAuditLogs(proposalId: string): Promise<any[]> {
     if (!this.isConfigured() || !proposalId) return [];
+    // 1. Try dedicated koya_proposal_studio schema first
+    try {
+      const koyaRes = await fetch(
+        `${this.url}/rest/v1/proposal_audit_logs?proposal_id=eq.${encodeURIComponent(proposalId)}&select=*&order=timestamp.asc`,
+        {
+          headers: this.getHeaders('return=representation', 'koya_proposal_studio')
+        }
+      );
+      if (koyaRes.ok) {
+        const data = await koyaRes.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    // 2. Fallback to public schema
     try {
       const res = await fetch(
         `${this.url}/rest/v1/proposal_audit_logs?proposal_id=eq.${encodeURIComponent(proposalId)}&select=*&order=timestamp.asc`,
@@ -147,20 +200,39 @@ export class SupabaseService {
         updated_at: proposal.updated_at
       };
 
-      // 1. Primary sync attempt to proposals table
-      const res = await fetch(`${this.url}/rest/v1/proposals`, {
-        method: 'POST',
-        headers: this.getHeaders('resolution=merge-duplicates,return=representation'),
-        body: JSON.stringify(payload)
-      });
-
+      // 1. Attempt write to dedicated koya_proposal_studio schema
       let proposalsTableSynced = false;
-      if (res.ok) {
-        proposalsTableSynced = true;
-        this.logger.log(`[Supabase] Proposal ${proposal.id} successfully saved to public.proposals`);
-      } else {
-        const errorText = await res.text();
-        this.logger.warn(`Supabase public.proposals sync notice: HTTP ${res.status} - ${errorText}`);
+      try {
+        const koyaRes = await fetch(`${this.url}/rest/v1/proposals`, {
+          method: 'POST',
+          headers: this.getHeaders('resolution=merge-duplicates,return=representation', 'koya_proposal_studio'),
+          body: JSON.stringify(payload)
+        });
+        if (koyaRes.ok) {
+          proposalsTableSynced = true;
+          this.logger.log(`[Supabase] Proposal ${proposal.id} successfully saved to koya_proposal_studio.proposals`);
+        }
+      } catch {
+        // Fallback to public
+      }
+
+      // 2. Also write to public.proposals table
+      try {
+        const res = await fetch(`${this.url}/rest/v1/proposals`, {
+          method: 'POST',
+          headers: this.getHeaders('resolution=merge-duplicates,return=representation'),
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          proposalsTableSynced = true;
+          this.logger.log(`[Supabase] Proposal ${proposal.id} successfully saved to public.proposals`);
+        } else {
+          const errorText = await res.text();
+          this.logger.warn(`Supabase public.proposals sync notice: HTTP ${res.status} - ${errorText}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Supabase public.proposals sync exception: ${err.message}`);
       }
 
       // 2. Cloud Mirror to operations_reports (guaranteed live table in Supabase)
@@ -242,16 +314,34 @@ export class SupabaseService {
         details: log.details
       };
 
-      // 1. Primary sync attempt to proposal_audit_logs table
-      const res = await fetch(`${this.url}/rest/v1/proposal_audit_logs`, {
-        method: 'POST',
-        headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
-        body: JSON.stringify(payload)
-      });
+      // 1. Attempt write to dedicated koya_proposal_studio schema
+      try {
+        const koyaRes = await fetch(`${this.url}/rest/v1/proposal_audit_logs`, {
+          method: 'POST',
+          headers: this.getHeaders('resolution=merge-duplicates,return=minimal', 'koya_proposal_studio'),
+          body: JSON.stringify(payload)
+        });
+        if (koyaRes.ok) {
+          this.logger.log(`[Supabase] Audit log saved to koya_proposal_studio.proposal_audit_logs`);
+        }
+      } catch {
+        // Fallback to public
+      }
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        this.logger.warn(`Supabase proposal_audit_logs sync notice: HTTP ${res.status} - ${errorText}`);
+      // 2. Also write to public.proposal_audit_logs table
+      try {
+        const res = await fetch(`${this.url}/rest/v1/proposal_audit_logs`, {
+          method: 'POST',
+          headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          this.logger.warn(`Supabase public.proposal_audit_logs sync notice: HTTP ${res.status} - ${errorText}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Supabase public.proposal_audit_logs sync exception: ${err.message}`);
       }
 
       // 2. Cloud run_log event in Supabase
