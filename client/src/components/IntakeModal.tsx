@@ -130,8 +130,9 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({
       setValidationError('A valid Client Email address is required to enable automated governance delivery.');
       return;
     }
-    if (!clientNeedsSummary.trim() || clientNeedsSummary.trim().length < 10) {
-      setValidationError('Client Problem & Pain Points must contain at least 10 characters to ensure coherent AI proposal generation.');
+    const today = new Date().toISOString().split('T')[0];
+    if (dateOfCall && dateOfCall > today) {
+      setValidationError(`Discovery Call Date (${dateOfCall}) cannot be in the future. Please select today (${today}) or an earlier date.`);
       return;
     }
     setValidationError(null);
@@ -329,8 +330,17 @@ export const IntakeModal: React.FC<IntakeModalProps> = ({
                 </label>
                 <input
                   type="date"
+                  max={new Date().toISOString().split('T')[0]}
                   value={dateOfCall}
-                  onChange={(e) => setDateOfCall(e.target.value)}
+                  onChange={(e) => {
+                    setDateOfCall(e.target.value);
+                    const today = new Date().toISOString().split('T')[0];
+                    if (e.target.value && e.target.value > today) {
+                      setValidationError(`Discovery Date cannot be in the future. Selected date must be today (${today}) or earlier.`);
+                    } else {
+                      setValidationError(null);
+                    }
+                  }}
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 dark:bg-slate-900 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-slate-900 dark:focus:border-slate-400 transition-colors"
                 />
               </div>

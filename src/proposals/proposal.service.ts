@@ -101,6 +101,15 @@ export class ProposalService implements OnModuleInit {
       throw new BadRequestException('Missing required field: intake_data');
     }
 
+    if (intakeData.date_of_call) {
+      const today = new Date().toISOString().split('T')[0];
+      if (intakeData.date_of_call > today) {
+        throw new BadRequestException(
+          `Invalid Discovery Date: Discovery call date (${intakeData.date_of_call}) cannot be in the future. It must be today (${today}) or earlier.`
+        );
+      }
+    }
+
     if (intakeData.client_email && this.isInternalStaffEmail(intakeData.client_email)) {
       throw new BadRequestException(
         `Segregation of Duties Violation: '${intakeData.client_email}' is an internal management/sales staff email. Client email must belong to an external customer.`
@@ -575,31 +584,21 @@ export class ProposalService implements OnModuleInit {
       });
     }
 
-    // --- DUAL-MANAGER INDEPENDENT APPROVAL GATE ---
-    // If a manager edited the proposal, that manager CANNOT approve their own edits!
-    // An independent secondary manager must review and approve.
-    const isEditor = Boolean(
+    // --- MANAGERIAL REVIEW & REDLINES AUDIT TRACKING ---
+    // If the reviewing manager made edits or redlines during evaluation of the sales rep's proposal,
+    // we log the action in the immutable audit trail while allowing the manager to approve the deal.
+    // Four-Eyes separation of duties is strictly enforced above (sales creator !== approver).
+    const isManagerEditor = Boolean(
       approverId &&
       proposal.last_edited_by_user_id &&
       approverId === proposal.last_edited_by_user_id &&
       proposal.last_edited_by_role === 'manager'
     );
 
-    if (isEditor) {
-      this.storage.addAuditLog(id, 'authz_denied', approverName, {
-        reason: 'Dual-Manager Governance violation: A manager cannot approve modifications they made.',
-        last_edited_by: proposal.last_edited_by_user_id,
+    if (isManagerEditor) {
+      this.storage.addAuditLog(id, 'manager_redlines_approved', approverName, {
+        message: 'Sales Manager approved proposal incorporating their own managerial review redlines.',
         approver_id: approverId
-      });
-
-      throw new ForbiddenException({
-        success: false,
-        error: 'Independent Manager Approval Required',
-        message:
-          'Dual-Manager Governance violation: You modified this proposal. An independent secondary manager must review and approve your edits before delivery to the customer.',
-        code: 'INDEPENDENT_MANAGER_APPROVAL_REQUIRED',
-        last_edited_by_user_id: proposal.last_edited_by_user_id,
-        attempted_by_user_id: approverId
       });
     }
 

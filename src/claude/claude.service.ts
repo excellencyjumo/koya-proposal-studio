@@ -128,6 +128,37 @@ export class ClaudeService {
       });
     }
 
+    // --- TIMELINE CONFLICT DETECTION ---
+    // Check if client_needs_summary or project_scope contains an operational timeline constraint that contradicts proposed_timeline
+    const needsText = `${intake.client_needs_summary || ''} ${intake.project_scope || ''}`.toLowerCase();
+    const timelineText = String(timeline || '').toLowerCase();
+
+    const parseDurationWeeks = (str: string): number | null => {
+      const weekMatch = str.match(/(\d+)\s*[- ]?week/i);
+      if (weekMatch) return parseInt(weekMatch[1], 10);
+      const wordMap: Record<string, number> = {
+        one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12
+      };
+      for (const [w, n] of Object.entries(wordMap)) {
+        if (new RegExp(`\\b${w}\\s*[- ]?week`, 'i').test(str)) return n;
+      }
+      const monthMatch = str.match(/(\d+)\s*[- ]?month/i);
+      if (monthMatch) return parseInt(monthMatch[1], 10) * 4;
+      return null;
+    };
+
+    const requiredWeeks = parseDurationWeeks(needsText);
+    const proposedWeeks = parseDurationWeeks(timelineText);
+
+    if (requiredWeeks && proposedWeeks && requiredWeeks !== proposedWeeks) {
+      gaps.push({
+        field: 'timeline_conflict',
+        severity: 'critical',
+        issue: `Timeline Contradiction: Client operational requirement specifies ${requiredWeeks} weeks, but proposed timeline specifies ${proposedWeeks} weeks.`,
+        recommendation: `Reconcile the operational deadline (${requiredWeeks} weeks) with proposed scope (${proposedWeeks} weeks) before finalizing delivery timeline.`
+      });
+    }
+
     return gaps;
   }
 
@@ -147,16 +178,31 @@ export class ClaudeService {
     }
 
     const gaps = this.analyzeInputGaps(intakeData);
-    const hasGaps = gaps.length > 0;
 
     const systemPrompt = `You are a Principal Enterprise Solutions Architect at Koya Talent.
 Generate a structured, rigorous 7-section professional proposal aligned with Koya Talent's proposal template.
-Strict adherence to truthfulness: DO NOT invent fake budget figures, SLAs, or timelines.
-If pricing, budget, or timeline data is missing from the intake, insert "[TO BE CONFIRMED]" as explicit placeholders so the human reviewer can finalize them.
-CRITICAL MANDATE: If pricing, timeline, or scope ARE provided in the intake requirements, you MUST use the exact provided values (e.g. the exact fee amount and duration) and you are STRICTLY FORBIDDEN from inserting "[TO BE CONFIRMED]" or "[TBC]" in those sections.
 
-Supporting Documentation Integration:
-If supporting background documentation, discovery notes, or call transcripts are provided, you MUST actively analyze and extract their concrete details (client technical stack, existing bottlenecks, specific integration requirements, past incident data, or stated milestones) and meaningfully incorporate them into the relevant sections (especially Project Scope, Recommended Approach, Deliverables, and Timeline). Do not produce generic boilerplate when real supporting material is provided.
+STRICT COMMERCIAL & TIMELINE GROUNDING MANDATE:
+1. TRUTHFULNESS & ZERO INVENTED COMMERCIAL TERMS:
+   - You are STRICTLY FORBIDDEN from calculating, inventing, or synthesizing ungrounded financial commitments.
+   - If the commercial pricing in the intake is provided as a simple lump-sum/total (e.g. "$40,000", "40k", or a single figure) WITHOUT an explicit breakdown:
+     * State the exact total fee provided.
+     * DO NOT fabricate milestone breakdowns or phase splits (e.g. do NOT invent "$8k / $18k / $10k / $4k").
+     * DO NOT invent payment percentage terms (e.g. do NOT invent "50/50 payment terms", "50% upfront", or "Net 30").
+     * DO NOT invent post-launch warranty or support durations (e.g. do NOT invent "30 days of support").
+     * DO NOT invent change-order fee schedules or travel expense policies (e.g. do NOT invent "travel expenses at cost + 10%").
+     * For any commercial terms not explicitly provided in the intake, you MUST insert:
+       "[TO BE CONFIRMED: Payment schedule, milestone allocations, warranty period, and travel/expense policies pending commercial review]"
+2. TIMELINE CONFLICT HANDLING:
+   - If there is a contradiction between the client's operational deadline (e.g. 4-week requirement in needs/scope) and the proposed timeline (e.g. 8-week proposed duration):
+     * You MUST NOT silently adopt one and ignore the other.
+     * In the Timeline section, you MUST explicitly escalate the discrepancy:
+       "[TO BE CONFIRMED: Timeline Conflict — Client operational requirement indicates a 4-week turnaround, whereas proposed delivery scope indicates 8 weeks. Feasibility alignment required prior to manager approval.]"
+3. MISSING INFORMATION:
+   - If pricing, timeline, or scope are completely missing from the intake, insert "[TO BE CONFIRMED]" as explicit placeholders so the human reviewer can finalize them.
+   - If a field IS provided, use the exact provided values.
+4. Supporting Documentation:
+   - Meaningfully incorporate real client technical stack, constraints, and details if provided.
 
 You must format your response as a valid JSON object with EXACTLY these 7 section keys:
 {
@@ -340,12 +386,117 @@ Generate all 7 sections adhering to the strict JSON schema.`;
       truncated: false
     };
 
+    const validated = this.validateCommercialGrounding(sections, intakeData, gaps);
+
     return {
       title: parsed.title || `Enterprise Solutions Proposal - ${intakeData.company_name || 'Client'}`,
-      has_gaps: hasGaps,
-      gaps,
-      sections,
+      has_gaps: validated.hasGaps,
+      gaps: validated.gaps,
+      sections: validated.sections,
       telemetry
+    };
+  }
+
+  validateCommercialGrounding(
+    sections: Record<string, string>,
+    intakeData: Record<string, any>,
+    gaps: any[]
+  ): { sections: Record<string, string>; gaps: any[]; hasGaps: boolean } {
+    const updatedSections = { ...sections };
+    const pricingInput = String(intakeData.estimated_pricing || intakeData.pricing || intakeData.budget || '').trim();
+    const needsInput = String(intakeData.client_needs_summary || '').toLowerCase();
+    const scopeInput = String(intakeData.project_scope || '').toLowerCase();
+
+    // 1. Audit Pricing Section for ungrounded financial terms
+    if (updatedSections.pricing) {
+      let pricingText = updatedSections.pricing;
+      let detectedUngrounded = false;
+
+      // Check for ungrounded payment splits (e.g. "50/50", "50% upon signing", "30% deposit", "Net 30")
+      const paymentSplitRegex = /\b(\d{1,2}\/\d{1,2}\s+payment|\d{1,2}%\s+(?:upon|deposit|upfront|on completion)|net\s*\d{1,2})\b/i;
+      const hasIntakePaymentTerms = /deposit|upfront|milestone|net\s*\d|\d+%/i.test(pricingInput);
+      if (!hasIntakePaymentTerms && paymentSplitRegex.test(pricingText)) {
+        pricingText = pricingText.replace(
+          new RegExp('(?:payment terms are|payment terms:)[^.\\n]+(?:\\.|\\n|$)', 'gi'),
+          'Payment Terms: [TO BE CONFIRMED: Payment schedule and milestone terms pending commercial review]. '
+        );
+        detectedUngrounded = true;
+      }
+
+      // Check for ungrounded phase breakdowns ($Xk / $Yk) if intake only had a single lump sum
+      const isLumpSumOnly = /^[\$£€]?\s*\d+(?:,\d{3})*(?:\.\d+)?\s*(?:k|usd|eur|gbp)?$/i.test(pricingInput);
+      if (isLumpSumOnly) {
+        if (/phase\s*\d+[^:.\n]*[\$£€]\s*\d+/i.test(pricingText)) {
+          pricingText = pricingText.replace(
+            /(?:broken down as follows|phase \d+:)[^.\n]+(?:\.|$)/gi,
+            'Milestone breakdown: [TO BE CONFIRMED: Phase allocations pending project scoping].'
+          );
+          detectedUngrounded = true;
+        }
+      }
+
+      // Check for ungrounded support/warranty terms (e.g. "30 days of support", "post-launch support")
+      const supportRegex = /\b(\d+\s*days?\s+(?:of\s+)?(?:post-launch\s+)?(?:support|warranty))\b/i;
+      if (!supportRegex.test(pricingInput) && !supportRegex.test(needsInput) && !supportRegex.test(scopeInput)) {
+        if (supportRegex.test(pricingText)) {
+          pricingText = pricingText.replace(
+            new RegExp('(?:includes|with)?\\s*\\d+\\s*days?\\s+(?:of\\s+)?(?:post-launch\\s+)?(?:support|warranty)[^.\\n]*(?:\\.|\\n|$)', 'gi'),
+            'Support SLA: [TO BE CONFIRMED: Post-launch warranty and SLA duration to be confirmed with client]. '
+          );
+          detectedUngrounded = true;
+        }
+      }
+
+      // Check for ungrounded travel/expense terms (e.g. "travel expenses at cost + 10%")
+      const expenseRegex = /(?:travel\s+expenses?|expenses?)\s+(?:billed\s+)?at\s+cost\s*\+\s*\d+%/i;
+      if (!expenseRegex.test(pricingInput) && !expenseRegex.test(needsInput) && !expenseRegex.test(scopeInput)) {
+        if (expenseRegex.test(pricingText)) {
+          pricingText = pricingText.replace(
+            /(?:travel\s+expenses?|expenses?)[^.\n]+cost\s*\+\s*\d+%[^.\n]*(?:\.|$)/gi,
+            'Expenses Policy: [TO BE CONFIRMED: Travel and out-of-pocket expense policies pending client agreement].'
+          );
+          detectedUngrounded = true;
+        }
+      }
+
+      // Check for ungrounded change-order clauses
+      const changeOrderRegex = /change[- ]orders?\s+(?:are\s+)?billed\s+at[^.\n]+(?:\.|$)/i;
+      if (!changeOrderRegex.test(pricingInput) && !changeOrderRegex.test(needsInput) && !changeOrderRegex.test(scopeInput)) {
+        if (changeOrderRegex.test(pricingText)) {
+          pricingText = pricingText.replace(
+            changeOrderRegex,
+            'Change Orders: [TO BE CONFIRMED: Scope alteration rates and procedures to be formalized].'
+          );
+          detectedUngrounded = true;
+        }
+      }
+
+      updatedSections.pricing = pricingText;
+
+      if (detectedUngrounded) {
+        gaps.push({
+          field: 'commercial_grounding_audit',
+          severity: 'high',
+          issue: 'Detected ungrounded commercial commitments (payment schedule, warranty, or expenses) not supplied in intake.',
+          recommendation: 'Replaced ungrounded terms with [TO BE CONFIRMED] placeholders to protect enterprise liability.'
+        });
+      }
+    }
+
+    // 2. Audit Timeline Section for Timeline Conflict
+    const hasTimelineConflictGap = gaps.some((g) => g.field === 'timeline_conflict');
+    if (hasTimelineConflictGap && updatedSections.timeline) {
+      if (!/\[TO BE CONFIRMED:\s*Timeline Conflict/i.test(updatedSections.timeline)) {
+        updatedSections.timeline =
+          `> ⚠️ **[TO BE CONFIRMED: Timeline Conflict Detected]** Client operational requirements specify an urgent delivery timeframe that conflicts with the standard delivery duration. Timeline feasibility must be reconciled prior to manager sign-off.\n\n` +
+          updatedSections.timeline;
+      }
+    }
+
+    return {
+      sections: updatedSections,
+      gaps,
+      hasGaps: gaps.length > 0
     };
   }
 
